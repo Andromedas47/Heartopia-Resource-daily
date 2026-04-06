@@ -1,0 +1,239 @@
+.mapCard {
+  border-radius: 20px;
+  border: 1px solid rgb(24 47 54 / 13%);
+  background:
+    radial-gradient(circle at 85% 12%, rgb(255 235 176 / 42%) 0%, transparent 44%),
+    linear-gradient(165deg, rgb(255 255 255 / 92%) 0%, rgb(246 252 250 / 88%) 100%);
+  box-shadow: 0 16px 30px rgb(21 33 38 / 9%);
+  padding: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.mapHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mapEyebrow {
+  margin-bottom: 6px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #2d6a73;
+  font-weight: 700;
+}
+
+.mapHeader h3 {
+  font-size: 1.16rem;
+  color: #122c33;
+  letter-spacing: -0.01em;
+}
+
+.mapHeader span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgb(27 120 101 / 16%);
+  color: #18584a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.headerPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.pickerOn {
+  background: rgb(40 106 151 / 15%);
+  color: #184d77;
+}
+
+.mapShell {
+  border-radius: 16px;
+  border: 1px solid rgb(27 69 78 / 16%);
+  background: rgb(249 255 255 / 84%);
+  padding: 8px;
+}
+
+.mapCanvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+.mapImage {
+  object-fit: contain;
+}
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 130ms ease, filter 130ms ease;
+  filter: drop-shadow(0 7px 12px rgb(16 35 40 / 38%));
+  z-index: 2;
+  padding: 0;
+}
+
+.marker:hover,
+.marker:focus-visible {
+  transform: translate(-50%, -50%) scale(1.06);
+  filter: drop-shadow(0 10px 20px rgb(16 35 40 / 45%));
+  outline: none;
+}
+
+.markerFrame {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: 3px solid rgb(255 255 255 / 96%);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 8px 18px rgb(12 34 41 / 28%);
+  display: grid;
+  place-items: center;
+}
+
+.markerIconWrap {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(160deg, rgb(252 255 255 / 95%) 0%, rgb(240 247 251 / 94%) 100%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.markerIconAsset {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.markerEmoji {
+  font-size: 1.05rem;
+}
+
+.markerActive {
+  transform: translate(-50%, -50%) scale(1.12);
+  z-index: 4;
+}
+
+.pickedDot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: #f26a5a;
+  box-shadow: 0 0 0 4px rgb(242 106 90 / 30%);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.pickerPanel {
+  border-radius: 12px;
+  border: 1px dashed rgb(47 99 145 / 42%);
+  background: rgb(235 245 255 / 86%);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.pickerPanel p {
+  color: #1f5178;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pickerPanel ul {
+  list-style: none;
+  display: grid;
+  gap: 3px;
+}
+
+.pickerPanel li,
+.pickerPanel small {
+  color: #284d6b;
+  font-size: 0.78rem;
+}
+
+.emptyHint {
+  border: 1px dashed rgb(23 53 61 / 20%);
+  border-radius: 10px;
+  margin-top: 4px;
+  padding: 9px;
+  font-size: 0.82rem;
+  color: #445b62;
+}
+
+.missingPanel {
+  border-radius: 12px;
+  border: 1px dashed rgb(138 99 38 / 30%);
+  background: rgb(255 250 238 / 88%);
+  padding: 10px;
+}
+
+.missingPanel p {
+  color: #7f5b21;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.missingPanel ul {
+  list-style: disc;
+  margin-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.missingPanel li {
+  color: #5a4a2d;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 760px) {
+  .mapCard {
+    padding: 12px;
+  }
+
+  .marker {
+    width: 46px;
+    height: 46px;
+  }
+
+  .markerFrame {
+    width: 40px;
+    height: 40px;
+    border-width: 2px;
+  }
+
+  .markerIconWrap {
+    width: 28px;
+    height: 28px;
+  }
+
+  .markerEmoji {
+    font-size: 0.9rem;
+  }
+
+  .markerIconAsset {
+    width: 22px;
+    height: 22px;
+  }
+}

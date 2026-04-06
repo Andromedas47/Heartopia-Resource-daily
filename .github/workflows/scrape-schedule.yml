@@ -1,0 +1,162 @@
+name: Heartopia Scrape Scheduler
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Asia/Bangkok (UTC+7): 06:05, 12:05, 18:05, 00:05
+    - cron: '5 23,5,11,17 * * *'
+
+concurrency:
+  group: heartopia-scrape-schedule
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    name: Scrape Facebook and update MongoDB
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: true
+      SCRAPE_HEADLESS: true
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      MONGODB_DB_NAME: ${{ vars.MONGODB_DB_NAME }}
+      REPORT_COLLECTION: daily_reports
+      REPORT_STALE_HOURS: ${{ vars.REPORT_STALE_HOURS }}
+      SCRAPE_MAX_ATTEMPTS: ${{ vars.SCRAPE_MAX_ATTEMPTS }}
+      SCRAPE_TIMEOUT_MINUTES: ${{ vars.SCRAPE_TIMEOUT_MINUTES }}
+      FB_EMAIL: ${{ secrets.FB_EMAIL }}
+      FB_PASSWORD: ${{ secrets.FB_PASSWORD }}
+      FB_AUTH_STATE_BASE64: ${{ secrets.FB_AUTH_STATE_BASE64 }}
+      ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+      ALERT_EMAIL_FROM: ${{ secrets.ALERT_EMAIL_FROM }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Validate required configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+
+          if [ -z "${MONGODB_URI:-}" ]; then
+            missing+=("MONGODB_URI")
+          fi
+
+          if [ -z "${FB_AUTH_STATE_BASE64:-}" ] && { [ -z "${FB_EMAIL:-}" ] || [ -z "${FB_PASSWORD:-}" ]; }; then
+            missing+=("FB_AUTH_STATE_BASE64 or FB_EMAIL+FB_PASSWORD")
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required configuration: ${missing[*]}"
+            exit 1
+          fi
+
+          if [ -z "${REPORT_STALE_HOURS:-}" ]; then
+            echo "REPORT_STALE_HOURS is not set. Defaulting to 8 hours."
+          fi
+
+          if [ -z "${SCRAPE_MAX_ATTEMPTS:-}" ]; then
+            echo "SCRAPE_MAX_ATTEMPTS is not set. Defaulting to 3 attempts."
+          fi
+
+          if [ -z "${SCRAPE_TIMEOUT_MINUTES:-}" ]; then
+            echo "SCRAPE_TIMEOUT_MINUTES is not set. Defaulting to 25 minutes per attempt."
+          fi
+
+      - name: Run scheduled scraper with retry
+        id: scrape_run
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_attempts="${SCRAPE_MAX_ATTEMPTS:-3}"
+          attempt_timeout_minutes="${SCRAPE_TIMEOUT_MINUTES:-25}"
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "Starting scrape attempt ${attempt}/${max_attempts}"
+
+            if timeout "${attempt_timeout_minutes}m" bun run scrape; then
+              echo "status=success" >> "$GITHUB_OUTPUT"
+              echo "attempts=${attempt}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            if [ "$attempt" -lt "$max_attempts" ]; then
+              backoff_seconds=$(( attempt * 45 ))
+              echo "Attempt ${attempt} failed. Waiting ${backoff_seconds}s before retry."
+              sleep "$backoff_seconds"
+            fi
+          done
+
+          echo "status=failed" >> "$GITHUB_OUTPUT"
+          echo "attempts=${max_attempts}" >> "$GITHUB_OUTPUT"
+          echo "::error::Scraper failed after ${max_attempts} attempts."
+          exit 1
+
+      - name: Validate latest report freshness
+        id: freshness
+        if: success()
+        run: bun run check:freshness
+
+      - name: Send alert email on failure
+        if: failure() && env.ALERT_EMAIL_TO != '' && env.ALERT_EMAIL_FROM != '' && env.SMTP_HOST != '' && env.SMTP_PORT != '' && env.SMTP_USERNAME != '' && env.SMTP_PASSWORD != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ env.SMTP_HOST }}
+          server_port: ${{ env.SMTP_PORT }}
+          secure: ${{ env.SMTP_SECURE == 'true' }}
+          username: ${{ env.SMTP_USERNAME }}
+          password: ${{ env.SMTP_PASSWORD }}
+          to: ${{ env.ALERT_EMAIL_TO }}
+          from: ${{ env.ALERT_EMAIL_FROM }}
+          subject: "[Heartopia] Scrape workflow failure alert"
+          body: |
+            Heartopia scrape workflow failed.
+
+            Repository: ${{ github.repository }}
+            Workflow: ${{ github.workflow }}
+            Branch: ${{ github.ref_name }}
+            Run URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Scrape status: ${{ steps.scrape_run.outputs.status }}
+            Scrape attempts: ${{ steps.scrape_run.outputs.attempts }}
+
+            Freshness status: ${{ steps.freshness.outputs.status }}
+            Latest report date: ${{ steps.freshness.outputs.latest_date }}
+            Latest scrapedAt: ${{ steps.freshness.outputs.latest_scraped_at }}
+            Data age (hours): ${{ steps.freshness.outputs.age_hours }}
+            Stale threshold (hours): ${{ steps.freshness.outputs.threshold_hours }}
+
+      - name: Warning when alert email is not configured
+        if: failure() && (env.ALERT_EMAIL_TO == '' || env.ALERT_EMAIL_FROM == '' || env.SMTP_HOST == '' || env.SMTP_PORT == '' || env.SMTP_USERNAME == '' || env.SMTP_PASSWORD == '')
+        shell: bash
+        run: |
+          echo "::warning::Workflow failed but alert email is not configured."
+          echo "::warning::Set ALERT_EMAIL_TO, ALERT_EMAIL_FROM, SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD in repository secrets."
+
+      - name: Upload scrape logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-log-${{ github.run_id }}
+          path: |
+            logs/**
+            playwright-report/**
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,70 @@
+$ bunx playwright test tests/heartopia-scraper.spec.ts --reporter=line
+◇ injecting env (4) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injecting env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+Running 1 test using 1 worker
+
+[1A[2K◇ injecting env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+
+[1A[2K◇ injecting env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+
+[1A[2K[1/1] [chromium] › tests\heartopia-scraper.spec.ts:63:5 › Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด → บันทึกลง MongoDB
+[1A[2K[chromium] › tests\heartopia-scraper.spec.ts:63:5 › Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด → บันทึกลง MongoDB
+🔑 โหลด 9 Cookies เรียบร้อย
+
+[1A[2K✅ Login อยู่แล้ว
+
+[1A[2K
+📄 เปิดเพจ DailyHeartopia...
+
+[1A[2K
+📅 รายงานประจำวัน Heartopia — 2 เมษายน 2569
+
+
+[1A[2K🪨 ไม้โอ๊กและหินเรืองแสง
+   ❌ ไม่พบโพสต์วันนี้
+
+[1A[2K
+
+[1A[2K🎁 โค้ด Redeem
+
+[1A[2K   🔑 Blueprint
+
+[1A[2K   🔑 Plant
+
+[1A[2K   🔑 Shelf
+
+[1A[2K   🔑 using
+
+[1A[2K   🔑 towel
+
+[1A[2K   🔑 perfect
+
+[1A[2K   🔑 Check
+
+[1A[2K   🔑 photos
+
+[1A[2K   🔑 ideas
+
+[1A[2K   🔑 Xiaohongshu
+
+[1A[2K   🔑 Inspiration
+
+[1A[2K   🔑 Roniin
+
+[1A[2K   🔑 Ronan
+
+[1A[2K
+💾 กำลังเชื่อมต่อ MongoDB Atlas...
+
+[1A[2K✅ Connected to MongoDB Atlas (heartopia)
+
+[1A[2K✅ บันทึกลง MongoDB สำเร็จ! (date: 2026-04-02)
+
+[1A[2K   📍 พิกัดแร่: 0 แห่ง
+
+[1A[2K   🔑 โค้ด: 13 โค้ด
+
+[1A[2K🔌 Disconnected from MongoDB
+
+[1A[2K  1 passed (1.2m)

@@ -1,0 +1,27 @@
+{
+  "name": "heartopia-daily",
+  "version": "1.0.0",
+  "description": "Heartopia Daily Scraper + API",
+  "main": "index.js",
+  "scripts": {
+    "scrape": "bunx playwright test tests/heartopia-scraper.spec.ts --reporter=line",
+    "scrape:headed": "bunx playwright test tests/heartopia-scraper.spec.ts --headed --reporter=line",
+    "check:freshness": "node scripts/check-report-freshness.cjs",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:install": "cd backend && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.59.0",
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.0",
+    "mongodb": "^7.1.1",
+    "mongoose": "^8.14.0"
+  }
+}

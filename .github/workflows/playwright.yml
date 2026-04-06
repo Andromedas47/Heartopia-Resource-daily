@@ -1,27 +1,35 @@
-name: Playwright Tests
+name: Daily Heartopia Scraper
+
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  schedule:
+    # ตั้งเวลารันอัตโนมัติทุกวันตอน 08:00 น. เช้า (เวลาไทย คือ 01:00 UTC)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # เพิ่มปุ่มกดรันเองผ่านหน้าเว็บ GitHub ได้ด้วย
+
 jobs:
-  test:
-    timeout-minutes: 60
+  scrape:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-node@v4
+    
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
       with:
-        node-version: lts/*
+        bun-version: latest
+        
     - name: Install dependencies
-      run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
-    - uses: actions/upload-artifact@v4
-      if: ${{ !cancelled() }}
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
+      run: bun install
+      
+    - name: Install Playwright Chromium
+      # ลงแค่ Chromium ตัวเดียวพอเพื่อความรวดเร็ว
+      run: bunx playwright install chromium --with-deps 
+      
+    - name: Run Scraper
+      env:
+        # ดึงตัวแปรจาก GitHub Secrets มาให้บอทใช้งาน
+        FB_EMAIL: ${{ secrets.FB_EMAIL }}
+        FB_PASSWORD: ${{ secrets.FB_PASSWORD }}
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        FB_AUTH_STATE_BASE64: ${{ secrets.FB_AUTH_STATE_BASE64 }} # สำคัญมากสำหรับข้ามการ Login
+      run: bun run scrape

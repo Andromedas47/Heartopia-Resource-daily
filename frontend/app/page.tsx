@@ -48,7 +48,7 @@ export default async function Home() {
         ...location,
         name: sanitizeLocationName(location.cleanedLocationName || location.name),
       }))
-      .filter((location) => location.name.length > 0) ?? [];
+      .filter((location) => location.name.length > 0 && !location.name.includes('#')) ?? [];
 
   const normalizedCodes =
     latestReport?.codes.items.filter((item) => item.code.trim().length > 0) ?? [];

@@ -1,4 +1,4 @@
-import { test, chromium } from '@playwright/test';
+import { test, chromium, devices } from '@playwright/test'; // 👈 นำเข้า devices มาปลอมตัว
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
@@ -31,7 +31,6 @@ function parseLocations(text: string): ILocation[] {
     if (!t || t.length > 150) continue;
 
     if (/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/.test(t)) {
-      // ดึงชื่อสถานที่ออกจากบรรทัด เช่น "ต้นไม้โอ๊ก สะพานเขต 5"
       const cleaned = t.replace(/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/g, '');
       pushLocation('oak', cleaned || t);
     } else if (/หินเรืองแสง/.test(t)) {
@@ -73,7 +72,6 @@ function parseCodes(text: string): ICode[] {
       detail = detail.split('>')[0].trim();
     }
 
-    // ตัดเศษตัวเลขชุดท้ายที่หลุดมาจาก UI (เช่น ยอด reaction/comment/share)
     detail = detail.replace(/\s\d+(?:\s*\/\s*\d+)?(?:\s+\d+){2,}\s*$/g, '').trim();
 
     if (detail.startsWith('(') && detail.endsWith(')')) {
@@ -119,18 +117,15 @@ function parseCodes(text: string): ICode[] {
 
     if (matches.length === 0) {
       if (!lastCodeItem) continue;
-
       const continuationExpiryMatch = line.match(/หมดเขต[^\n]*/i);
       if (continuationExpiryMatch && !lastCodeItem.expiry) {
         lastCodeItem.expiry = normalizeExpiry(continuationExpiryMatch[0]);
       }
-
       const continuationDetailRaw = line.replace(continuationExpiryMatch?.[0] ?? '', ' ');
       const continuationDetail = normalizeDetail(continuationDetailRaw);
       if (continuationDetail) {
         lastCodeItem.detail = normalizeDetail(`${lastCodeItem.detail} ${continuationDetail}`);
       }
-
       continue;
     }
 
@@ -174,82 +169,44 @@ function getTodayDateString(): string {
 function resolveHeadlessMode(): boolean {
   const raw = process.env.SCRAPE_HEADLESS;
   if (!raw) return process.env.CI === 'true';
-
   return !['0', 'false', 'no', 'off'].includes(raw.toLowerCase());
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
 test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด → บันทึกลง MongoDB', async () => {
   test.setTimeout(0);
+  const headless = resolveHeadlessMode();
 
-  const userDataDir = path.resolve(__dirname, '../playwright/.user_data');
-  const authFile    = path.resolve(__dirname, '../playwright/.auth/user.json');
-  const headless    = resolveHeadlessMode();
+  console.log('🚀 เริ่มรันบอท (โหมดปลอมตัวเป็น iPhone)...');
+  
+  // ── ปลอมตัวเป็น iPhone 13 ───────────────────────────────────────────────
+  const browser = await chromium.launch({ headless });
+  const iPhone = devices['iPhone 13'];
 
-  // รองรับการส่ง auth state จาก Secret (base64) สำหรับการรันบน cloud/CI
-  const authStateBase64 = process.env.FB_AUTH_STATE_BASE64;
-  if (authStateBase64 && !fs.existsSync(authFile)) {
-    const authDir = path.dirname(authFile);
-    if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
-
-    fs.writeFileSync(authFile, Buffer.from(authStateBase64, 'base64').toString('utf-8'));
-    console.log('🔐 โหลด auth state จาก FB_AUTH_STATE_BASE64 แล้ว');
-  }
-
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    headless,
-    viewport: { width: 1280, height: 900 },
+  const context = await browser.newContext({
+    ...iPhone, // ยัดสเปกมือถือลงไป
     locale: 'th-TH',
-    args: ['--disable-blink-features=AutomationControlled'],
   });
 
-  // โหลด Cookies
-  if (fs.existsSync(authFile)) {
-    const authData = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
-    if (authData.cookies?.length > 0) {
-      await context.addCookies(authData.cookies);
-      console.log(`🔑 โหลด ${authData.cookies.length} Cookies เรียบร้อย`);
-    }
-  }
-
-  const page = context.pages()[0] || await context.newPage();
+  const page = await context.newPage();
 
   try {
-    // ── Step 1: เช็ก Login ──────────────────────────────────────────────────
-    await page.goto('https://www.facebook.com', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(3000);
-
-    const isLoggedOut = await page.locator('input[name="email"]').isVisible({ timeout: 5000 }).catch(() => false);
-    if (isLoggedOut) {
-      const fbEmail = process.env.FB_EMAIL;
-      const fbPassword = process.env.FB_PASSWORD;
-
-      if (!fbEmail || !fbPassword) {
-        throw new Error('Missing FB_EMAIL/FB_PASSWORD. Provide credentials or set FB_AUTH_STATE_BASE64.');
-      }
-
-      console.log('⚠️ Session หมดอายุ กำลัง Login ใหม่...');
-      await page.fill('input[name="email"]', fbEmail);
-      await page.fill('input[name="pass"]', fbPassword);
-      await page.getByRole('button', { name: /Log In|เข้าสู่ระบบ/i }).first().click();
-      await page.waitForSelector('[role="navigation"]', { timeout: 120000 });
-      const authDir = path.resolve(__dirname, '../playwright/.auth');
-      if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
-      await context.storageState({ path: authFile });
-      console.log('✅ Login สำเร็จ! บันทึก Session แล้ว');
-    } else {
-      console.log('✅ Login อยู่แล้ว');
-    }
-
-    // ── Step 2: ไปหน้าเพจ ──────────────────────────────────────────────────
-    console.log('\n📄 เปิดเพจ DailyHeartopia...');
-    await page.goto('https://www.facebook.com/DailyHeartopia', {
+    // ── ไปหน้าเพจเวอร์ชันมือถือ ──────────────────────────────────────────────
+    console.log('\n📱 เปิดเพจ DailyHeartopia (m.facebook.com)...');
+    await page.goto('https://m.facebook.com/DailyHeartopia', {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
     await page.waitForTimeout(4000);
 
-    // Keyword สำหรับดักโพสต์
+    // ปิด Popup กวนใจ "เปิดในแอปไหม?" (ถ้ามี)
+    try {
+      await page.click('i[data-sigil="m-cancel-button"]', { timeout: 3000 });
+      console.log('✨ ปิดแบนเนอร์กวนใจสำเร็จ!');
+    } catch (e) {
+      // ไม่มีก็ผ่านไป
+    }
+
     const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน'];
     const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้'];
 
@@ -258,41 +215,38 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
     let bestCodeScore = -1;
     const seenFingerprints = new Set<string>();
 
+    // 📌 Selector สำหรับหาโพสต์ในหน้ามือถือ
+    const postSelector = 'div[data-sigil="story-div"], article';
+
     // ── PHASE 1: Scroll โหลดโพสต์ ──────────────────────────────────────────
-    for (let round = 0; round < 12; round++) {
-      const countBefore = await page.locator('div[role="article"]').count();
-      await page.evaluate(() => window.scrollBy({ top: 2000, behavior: 'smooth' }));
-      await page.waitForTimeout(2500);
-      const countAfter = await page.locator('div[role="article"]').count();
-      if (countAfter >= 20 && countAfter === countBefore) break;
+    for (let round = 0; round < 10; round++) {
+      const countBefore = await page.locator(postSelector).count();
+      await page.evaluate(() => window.scrollBy({ top: 1500, behavior: 'smooth' }));
+      await page.waitForTimeout(2000);
+      const countAfter = await page.locator(postSelector).count();
+      if (countAfter >= 15 && countAfter === countBefore) break;
     }
 
-    // ── PHASE 2: กด "ดูเพิ่มเติม" + อ่านเนื้อหา ──────────────────────────
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
     await page.waitForTimeout(1500);
 
-    const articles = await page.locator('div[role="article"]').all();
+    const articles = await page.locator(postSelector).all();
 
+    // ── PHASE 2: กด "ดูเพิ่มเติม" + อ่านเนื้อหา ──────────────────────────
     for (let i = 0; i < articles.length; i++) {
       const article = articles[i];
 
       await article.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'smooth' }));
       await page.waitForTimeout(600);
 
-      // กด "ดูเพิ่มเติม"
+      // กด "ดูเพิ่มเติม" (รองรับทั้งภาษาไทยและอังกฤษ)
       const expanded = await article.evaluate((el: Element) => {
-        const TARGET = ['ดูเพิ่มเติม', 'See more'];
+        const TARGET = ['ดูเพิ่มเติม', 'See more', 'อ่านเพิ่มเติม'];
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
         let node = walker.nextNode() as Element | null;
         while (node) {
-          const role = node.getAttribute('role');
-          const tag  = node.tagName;
-          const txt  = (node.textContent || '').trim();
-          if (
-            (role === 'button' || tag === 'SPAN' || tag === 'DIV') &&
-            txt.length <= 20 &&
-            TARGET.some(t => txt === t || txt.endsWith(t))
-          ) {
+          const txt = (node.textContent || '').trim();
+          if (txt.length <= 25 && TARGET.some(t => txt === t || txt.endsWith(t))) {
             (node as HTMLElement).click();
             return true;
           }
@@ -371,10 +325,9 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
       console.log('🎁 โค้ด Redeem\n   ❌ ไม่พบโพสต์วันนี้');
     }
 
-    // Debug ถ้าหาไม่เจอเลย
     if (!foundResourcePost && !foundCodePost) {
       console.log('🔍 DEBUG — ข้อความ 5 โพสต์แรก:');
-      const debugArticles = await page.locator('div[role="article"]').all();
+      const debugArticles = await page.locator(postSelector).all();
       for (let i = 0; i < Math.min(debugArticles.length, 5); i++) {
         const txt = await debugArticles[i].innerText().catch(() => '');
         console.log(`\n--- โพสต์ ${i + 1} ---\n${txt.substring(0, 400).trim()}`);
@@ -385,7 +338,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
     console.log('\n💾 กำลังเชื่อมต่อ MongoDB Atlas...');
     await connectDB();
 
-    const todayDate = getTodayDateString(); // "2026-04-02"
+    const todayDate = getTodayDateString();
     const locations = parseLocations(foundResourcePost);
     const codes     = parseCodes(foundCodePost);
 
@@ -416,6 +369,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
 
   } finally {
     await context.close();
+    await browser.close(); // ปิด Browser ตรงๆ เลย
     await disconnectDB();
   }
 });

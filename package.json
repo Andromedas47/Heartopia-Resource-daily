@@ -22,6 +22,7 @@
   "dependencies": {
     "dotenv": "^17.4.0",
     "mongodb": "^7.1.1",
-    "mongoose": "^8.14.0"
+    "mongoose": "^8.14.0",
+    "playwright": "^1.59.1"
   }
 }

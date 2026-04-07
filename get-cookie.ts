@@ -2,7 +2,10 @@ import { chromium } from 'playwright';
 
 (async () => {
   // 1. เปิดเบราว์เซอร์แบบ "มองเห็นได้" (ไม่ซ่อนหน้าจอ)
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ 
+    headless: false,
+    channel: 'chrome' 
+  });
   const context = await browser.newContext();
   const page = await context.newPage();
 

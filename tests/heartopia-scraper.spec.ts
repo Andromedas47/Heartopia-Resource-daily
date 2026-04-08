@@ -128,7 +128,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
   // 🔴 ต้องเอา API Token จากเว็บ Apify มาใส่ในไฟล์ .env (หรือ GitHub Secrets) ชื่อ APIFY_TOKEN นะครับ
   const APIFY_TOKEN = process.env.APIFY_TOKEN;
   // รหัสของบอท Facebook Pages Scraper (ถ้าใช้ตัวอื่นต้องเปลี่ยนชื่อตรงนี้นะครับ)
-  const ACTOR_ID = 'apify~facebook-pages-scraper'; 
+  const ACTOR_ID = 'apify~facebook-posts-scraper';
 
   if (!APIFY_TOKEN) {
     console.log('❌ ไม่พบ APIFY_TOKEN กรุณาตั้งค่าใน .env หรือ GitHub Secrets');
@@ -145,8 +145,11 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        "startUrls": [{ "url": "https://www.facebook.com/DailyHeartopia/" }],
-        "resultsLimit": 5 // เอาแค่ 5 โพสต์ก็พอ จะได้เร็วๆ
+        "captionText": false,
+        "resultsLimit": 10,
+        "startUrls": [
+          { "url": "https://www.facebook.com/DailyHeartopia/" }
+        ]
       })
     });
 

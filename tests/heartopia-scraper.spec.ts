@@ -1,4 +1,4 @@
-import { test, chromium, devices } from '@playwright/test'; // 👈 นำเข้า devices มาปลอมตัว
+import { test, chromium, devices } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
@@ -179,19 +179,17 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
 
   console.log('🚀 เริ่มรันบอท (โหมดปลอมตัวเป็น iPhone)...');
   
-  // ── ปลอมตัวเป็น iPhone 13 ───────────────────────────────────────────────
   const browser = await chromium.launch({ headless });
   const iPhone = devices['iPhone 13'];
 
   const context = await browser.newContext({
-    ...iPhone, // ยัดสเปกมือถือลงไป
+    ...iPhone,
     locale: 'th-TH',
   });
 
   const page = await context.newPage();
 
   try {
-    // ── ไปหน้าเพจเวอร์ชันมือถือ ──────────────────────────────────────────────
     console.log('\n📱 เปิดเพจ DailyHeartopia (m.facebook.com)...');
     await page.goto('https://m.facebook.com/DailyHeartopia', {
       waitUntil: 'domcontentloaded',
@@ -199,7 +197,6 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
     });
     await page.waitForTimeout(4000);
 
-    // ปิด Popup กวนใจ "เปิดในแอปไหม?" (ถ้ามี)
     try {
       await page.click('i[data-sigil="m-cancel-button"]', { timeout: 3000 });
       console.log('✨ ปิดแบนเนอร์กวนใจสำเร็จ!');
@@ -207,24 +204,38 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
       // ไม่มีก็ผ่านไป
     }
 
-    const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน'];
-    const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้'];
+    // 📌 ขยายคีย์เวิร์ดให้กว้างขึ้น ครอบคลุมการพิมพ์ผิดของแอดมิน
+    const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน', 'แร่', 'พิกัด'];
+    const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้', 'รหัส'];
 
     let foundResourcePost = '';
     let foundCodePost     = '';
     let bestCodeScore = -1;
     const seenFingerprints = new Set<string>();
 
-    // 📌 Selector สำหรับหาโพสต์ในหน้ามือถือ
     const postSelector = 'div[data-sigil="story-div"], article';
 
-    // ── PHASE 1: Scroll โหลดโพสต์ ──────────────────────────────────────────
-    for (let round = 0; round < 10; round++) {
-      const countBefore = await page.locator(postSelector).count();
-      await page.evaluate(() => window.scrollBy({ top: 1500, behavior: 'smooth' }));
-      await page.waitForTimeout(2000);
-      const countAfter = await page.locator(postSelector).count();
-      if (countAfter >= 15 && countAfter === countBefore) break;
+    // ── PHASE 1: Scroll โหลดโพสต์แบบชัวร์ๆ (แก้ปัญหาเว็บโหลดไม่ทัน) ──────────────
+    console.log('🔄 กำลังไถฟีดอย่างใจเย็น รอให้เว็บโหลดโพสต์...');
+    let previousHeight = 0;
+    
+    for (let round = 0; round < 12; round++) {
+      const currentHeight = await page.evaluate(() => document.body.scrollHeight);
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      
+      // ⏳ จุดสำคัญ: รอ 3 วินาทีเต็มๆ ให้ React ของเฟซบุ๊กดึงข้อมูลมาแปะหน้าจอ
+      await page.waitForTimeout(3000); 
+
+      if (currentHeight === previousHeight) {
+        // ถ้าไถแล้วความสูงเท่าเดิม แปลว่าอาจจะสุดจอ หรือเว็บค้าง ลองขยับขึ้นนิดนึงกระตุ้นมัน
+        await page.evaluate(() => window.scrollBy(0, -500));
+        await page.waitForTimeout(1000);
+      } else {
+        // เช็กว่าโหลดโพสต์มาพอหรือยัง (เอาแค่ 15 โพสต์แรกก็พอ)
+        const countAfter = await page.locator(postSelector).count();
+        if (countAfter >= 15) break; 
+      }
+      previousHeight = currentHeight;
     }
 
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -239,7 +250,6 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
       await article.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'smooth' }));
       await page.waitForTimeout(600);
 
-      // กด "ดูเพิ่มเติม" (รองรับทั้งภาษาไทยและอังกฤษ)
       const expanded = await article.evaluate((el: Element) => {
         const TARGET = ['ดูเพิ่มเติม', 'See more', 'อ่านเพิ่มเติม'];
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
@@ -369,7 +379,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
 
   } finally {
     await context.close();
-    await browser.close(); // ปิด Browser ตรงๆ เลย
+    await browser.close();
     await disconnectDB();
   }
 });

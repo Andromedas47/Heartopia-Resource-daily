@@ -1,15 +1,13 @@
-import { test, chromium, devices } from '@playwright/test';
+import { test } from '@playwright/test'; // 👈 นำเข้าแค่ test ก็พอ ไม่ต้องใช้ chromium แล้ว
 import path from 'path';
-import fs from 'fs';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import { DailyReport, ILocation, ICode } from '../src/models/DailyReport';
 import { connectDB, disconnectDB } from '../src/db';
 import { cleanLocationName } from '../backend/src/utils/cleanLocationName';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-// ── Helper: แปลง text เป็น ILocation[] ────────────────────────────────────
+// ── Helper: ของคุณพิชญ์ (เหมือนเดิม 100%) ────────────────────────────────────
 function parseLocations(text: string): ILocation[] {
   const locations: ILocation[] = [];
   const lines = text.split('\n');
@@ -41,7 +39,6 @@ function parseLocations(text: string): ILocation[] {
   return locations;
 }
 
-// ── Helper: แปลง text เป็น ICode[] ────────────────────────────────────────
 function parseCodes(text: string): ICode[] {
   const codes: ICode[] = [];
   const seen = new Set<string>();
@@ -55,47 +52,21 @@ function parseCodes(text: string): ICode[] {
 
   const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const normalizeDetail = (value: string): string => {
-    let detail = value
-      .replace(/[•·*:\-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const markerIndex = noiseTailMarkers
-      .map((marker) => detail.indexOf(marker))
-      .filter((index) => index >= 0)
-      .sort((a, b) => a - b)[0];
-    if (markerIndex !== undefined) {
-      detail = detail.slice(0, markerIndex).trim();
-    }
-
-    if (detail.includes('>')) {
-      detail = detail.split('>')[0].trim();
-    }
-
+    let detail = value.replace(/[•·*:\-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const markerIndex = noiseTailMarkers.map((marker) => detail.indexOf(marker)).filter((index) => index >= 0).sort((a, b) => a - b)[0];
+    if (markerIndex !== undefined) detail = detail.slice(0, markerIndex).trim();
+    if (detail.includes('>')) detail = detail.split('>')[0].trim();
     detail = detail.replace(/\s\d+(?:\s*\/\s*\d+)?(?:\s+\d+){2,}\s*$/g, '').trim();
-
-    if (detail.startsWith('(') && detail.endsWith(')')) {
-      detail = detail.slice(1, -1).trim();
-    }
-
-    if (/^(โค้ดที่ยังใช้งานได้|รวมโค้ดทั้งหมด|โค้ดเพิ่งค้นพบ.*|โค้ดใหม่.*)$/i.test(detail)) {
-      return '';
-    }
-
+    if (detail.startsWith('(') && detail.endsWith(')')) detail = detail.slice(1, -1).trim();
+    if (/^(โค้ดที่ยังใช้งานได้|รวมโค้ดทั้งหมด|โค้ดเพิ่งค้นพบ.*|โค้ดใหม่.*)$/i.test(detail)) return '';
     return detail;
   };
+
   const normalizeExpiry = (value: string): string => {
     let expiry = value.replace(/\s+/g, ' ').trim();
     expiry = expiry.replace(/มิ\.\s*\.ย\./g, 'มิ.ย.');
-
-    const markerIndex = noiseTailMarkers
-      .map((marker) => expiry.indexOf(marker))
-      .filter((index) => index >= 0)
-      .sort((a, b) => a - b)[0];
-    if (markerIndex !== undefined) {
-      expiry = expiry.slice(0, markerIndex).trim();
-    }
-
+    const markerIndex = noiseTailMarkers.map((marker) => expiry.indexOf(marker)).filter((index) => index >= 0).sort((a, b) => a - b)[0];
+    if (markerIndex !== undefined) expiry = expiry.slice(0, markerIndex).trim();
     return expiry;
   };
 
@@ -105,7 +76,6 @@ function parseCodes(text: string): ICode[] {
   for (const rawLine of lines) {
     const line = rawLine.replace(/\u00a0/g, ' ').trim();
     if (!line) continue;
-
     if (sectionHint.test(line)) enteredCodeSection = true;
     if (skipLine.test(line)) continue;
     if (/^#/.test(line)) break;
@@ -133,221 +103,111 @@ function parseCodes(text: string): ICode[] {
       const rawCode = m[1];
       const code = rawCode.replace(/[^a-zA-Z0-9_-]/g, '');
       const codeKey = code.toLowerCase();
-
-      if (code.length < 6) continue;
-      if (!/\d/.test(code)) continue;
-      if (/^x\d+$/i.test(code)) continue;
-      if (noiseToken.test(code)) continue;
-      if (seen.has(codeKey)) continue;
+      if (code.length < 6 || !/\d/.test(code) || /^x\d+$/i.test(code) || noiseToken.test(code) || seen.has(codeKey)) continue;
 
       seen.add(codeKey);
-
-      const detailRaw = line
-        .replace(new RegExp(`(^|\\s)${escapeRegExp(rawCode)}(?=\\s|$)`, 'i'), ' ')
-        .replace(expiry, ' ');
-
-      const codeItem: ICode = {
-        code,
-        detail: normalizeDetail(detailRaw),
-        expiry,
-      };
-
+      const detailRaw = line.replace(new RegExp(`(^|\\s)${escapeRegExp(rawCode)}(?=\\s|$)`, 'i'), ' ').replace(expiry, ' ');
+      const codeItem: ICode = { code, detail: normalizeDetail(detailRaw), expiry };
       codes.push(codeItem);
       lastCodeItem = codeItem;
     }
   }
-
   return codes;
 }
 
-// ── Helper: วันที่ YYYY-MM-DD (Bangkok time) ───────────────────────────────
 function getTodayDateString(): string {
-  return new Date()
-    .toLocaleDateString('fr-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
-}
-
-function resolveHeadlessMode(): boolean {
-  const raw = process.env.SCRAPE_HEADLESS;
-  if (!raw) return process.env.CI === 'true';
-  return !['0', 'false', 'no', 'off'].includes(raw.toLowerCase());
+  return new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด → บันทึกลง MongoDB', async () => {
-  test.setTimeout(0);
-  const headless = resolveHeadlessMode();
+test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด (ผ่าน Apify) → บันทึกลง MongoDB', async () => {
+  test.setTimeout(120000); // ให้เวลาบอท Apify วิ่งสัก 2 นาที
 
-  console.log('🚀 เริ่มรันบอท (โหมดปลอมตัวเป็น iPhone)...');
-  
-  const browser = await chromium.launch({ headless });
-  const iPhone = devices['iPhone 13'];
+  console.log('🚀 เริ่มรันระบบดึงข้อมูลผ่าน Apify...');
 
-  const context = await browser.newContext({
-    ...iPhone,
-    locale: 'th-TH',
-  });
+  // 🔴 ต้องเอา API Token จากเว็บ Apify มาใส่ในไฟล์ .env (หรือ GitHub Secrets) ชื่อ APIFY_TOKEN นะครับ
+  const APIFY_TOKEN = process.env.APIFY_TOKEN;
+  // รหัสของบอท Facebook Pages Scraper (ถ้าใช้ตัวอื่นต้องเปลี่ยนชื่อตรงนี้นะครับ)
+  const ACTOR_ID = 'apify~facebook-pages-scraper'; 
 
-  const page = await context.newPage();
+  if (!APIFY_TOKEN) {
+    console.log('❌ ไม่พบ APIFY_TOKEN กรุณาตั้งค่าใน .env หรือ GitHub Secrets');
+    return;
+  }
+
+  let posts: any[] = [];
 
   try {
-    console.log('\n📱 เปิดเพจ DailyHeartopia (m.facebook.com)...');
-    await page.goto('https://m.facebook.com/DailyHeartopia', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000,
-    });
-    await page.waitForTimeout(4000);
-
-    try {
-      await page.click('i[data-sigil="m-cancel-button"]', { timeout: 3000 });
-      console.log('✨ ปิดแบนเนอร์กวนใจสำเร็จ!');
-    } catch (e) {
-      // ไม่มีก็ผ่านไป
-    }
-
-    // 📌 ขยายคีย์เวิร์ดให้กว้างขึ้น ครอบคลุมการพิมพ์ผิดของแอดมิน
-    const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน', 'แร่', 'พิกัด'];
-    const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้', 'รหัส'];
-
-    let foundResourcePost = '';
-    let foundCodePost     = '';
-    let bestCodeScore = -1;
-    const seenFingerprints = new Set<string>();
-
-    const postSelector = 'div[data-sigil="story-div"], article';
-
-    // ── PHASE 1: Scroll โหลดโพสต์แบบชัวร์ๆ (แก้ปัญหาเว็บโหลดไม่ทัน) ──────────────
-    console.log('🔄 กำลังไถฟีดอย่างใจเย็น รอให้เว็บโหลดโพสต์...');
-    let previousHeight = 0;
+    console.log('⏳ กำลังสั่งให้ Apify บุก Facebook (รอประมาณ 30-60 วินาที)...');
     
-    for (let round = 0; round < 12; round++) {
-      const currentHeight = await page.evaluate(() => document.body.scrollHeight);
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      
-      // ⏳ จุดสำคัญ: รอ 3 วินาทีเต็มๆ ให้ React ของเฟซบุ๊กดึงข้อมูลมาแปะหน้าจอ
-      await page.waitForTimeout(3000); 
+    // ยิง API สั่งรันบอทและรอรับผลลัพธ์ (Dataset) กลับมาทันที
+    const response = await fetch(`https://api.apify.com/v2/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        "startUrls": [{ "url": "https://www.facebook.com/DailyHeartopia/" }],
+        "resultsLimit": 5 // เอาแค่ 5 โพสต์ก็พอ จะได้เร็วๆ
+      })
+    });
 
-      if (currentHeight === previousHeight) {
-        // ถ้าไถแล้วความสูงเท่าเดิม แปลว่าอาจจะสุดจอ หรือเว็บค้าง ลองขยับขึ้นนิดนึงกระตุ้นมัน
-        await page.evaluate(() => window.scrollBy(0, -500));
-        await page.waitForTimeout(1000);
-      } else {
-        // เช็กว่าโหลดโพสต์มาพอหรือยัง (เอาแค่ 15 โพสต์แรกก็พอ)
-        const countAfter = await page.locator(postSelector).count();
-        if (countAfter >= 15) break; 
-      }
-      previousHeight = currentHeight;
+    if (!response.ok) {
+      throw new Error(`Apify Error: ${response.status} ${response.statusText}`);
     }
 
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-    await page.waitForTimeout(1500);
+    posts = await response.json();
+    console.log(`✅ ดึงข้อมูลสำเร็จ! ได้มา ${posts.length} โพสต์`);
 
-    const articles = await page.locator(postSelector).all();
+  } catch (error) {
+    console.log('❌ การเชื่อมต่อกับ Apify ล้มเหลว:', error);
+    return;
+  }
 
-    // ── PHASE 2: กด "ดูเพิ่มเติม" + อ่านเนื้อหา ──────────────────────────
-    for (let i = 0; i < articles.length; i++) {
-      const article = articles[i];
+  // ── นำข้อความที่ได้มาเข้าเครื่องกรองของคุณพิชญ์ ─────────────────────────
+  const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน', 'แร่', 'พิกัด'];
+  const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้', 'รหัส'];
 
-      await article.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-      await page.waitForTimeout(600);
+  let foundResourcePost = '';
+  let foundCodePost     = '';
 
-      const expanded = await article.evaluate((el: Element) => {
-        const TARGET = ['ดูเพิ่มเติม', 'See more', 'อ่านเพิ่มเติม'];
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
-        let node = walker.nextNode() as Element | null;
-        while (node) {
-          const txt = (node.textContent || '').trim();
-          if (txt.length <= 25 && TARGET.some(t => txt === t || txt.endsWith(t))) {
-            (node as HTMLElement).click();
-            return true;
-          }
-          node = walker.nextNode() as Element | null;
-        }
-        return false;
-      });
+  for (const post of posts) {
+    const fullText = post.text || ''; // ดึงข้อความออกมาจาก JSON
 
-      if (expanded) await page.waitForTimeout(1200);
+    const isOrePost  = orePostTriggers.some(kw => fullText.includes(kw));
+    const isCodePost = codePostTriggers.some(kw => fullText.toLowerCase().includes(kw.toLowerCase()));
 
-      const fullText = await article.innerText().catch(() => '');
-      if (fullText.length < 30) continue;
+    if (isOrePost && !foundResourcePost) foundResourcePost = fullText;
+    if (isCodePost && !foundCodePost) foundCodePost = fullText;
+  }
 
-      const fingerprint = fullText.substring(0, 120).replace(/\s/g, '');
-      if (seenFingerprints.has(fingerprint)) continue;
-      seenFingerprints.add(fingerprint);
+  // ── แสดงผลลัพธ์ Console ─────────────────────────────────────────────────
+  const thDate = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+  console.log(`\n📅 รายงานประจำวัน Heartopia — ${thDate}\n`);
 
-      const isOrePost  = orePostTriggers.some(kw => fullText.includes(kw));
-      const isCodePost = codePostTriggers.some(kw => fullText.toLowerCase().includes(kw.toLowerCase()));
-      const parsedCodes = parseCodes(fullText);
+  if (foundResourcePost) {
+    console.log('🪨 ไม้โอ๊กและหินเรืองแสง');
+    foundResourcePost.split('\n').forEach((line: string) => {
+      const t = line.trim();
+      if (/ไม้โอ๊ก|ไม้โอ๊ค|หินเรืองแสง/.test(t)) console.log(`   ${t}`);
+    });
+  } else {
+    console.log('🪨 ไม้โอ๊กและหินเรืองแสง\n   ❌ ไม่พบโพสต์วันนี้');
+  }
 
-      if (isOrePost && !foundResourcePost) {
-        foundResourcePost = fullText;
-        const imgAlts = await article.evaluate((el: Element) =>
-          Array.from(el.querySelectorAll('img[alt]'))
-            .map(img => img.getAttribute('alt') || '')
-            .filter(alt => alt.length > 5)
-        );
-        if (imgAlts.length > 0) foundResourcePost += '\n[IMG ALT]: ' + imgAlts.join(' | ');
-      }
+  console.log('');
+  if (foundCodePost) {
+    console.log('🎁 โค้ด Redeem');
+    const rawCodes = parseCodes(foundCodePost);
+    if (rawCodes.length > 0) rawCodes.forEach(c => console.log(`   🔑 ${[c.code, c.detail, c.expiry].filter(Boolean).join(' ')}`));
+    else console.log('   ⚠️  โค้ดอยู่ในรูปภาพ');
+  } else {
+    console.log('🎁 โค้ด Redeem\n   ❌ ไม่พบโพสต์วันนี้');
+  }
 
-      if (isCodePost) {
-        const codeSectionBoost = /โค้ดที่ยังใช้งานได้|รวมโค้ดทั้งหมด/i.test(fullText) ? 2 : 0;
-        const expiryBoost = /หมดเขต/i.test(fullText) ? 1 : 0;
-        const score = parsedCodes.length + codeSectionBoost + expiryBoost;
+  // ── Step 3: บันทึกลง MongoDB Atlas ──────────────────────────────────────
+  console.log('\n💾 กำลังเชื่อมต่อ MongoDB Atlas...');
+  await connectDB();
 
-        if (score > bestCodeScore) {
-          bestCodeScore = score;
-          foundCodePost = fullText;
-        }
-
-        const imgAlts = await article.evaluate((el: Element) =>
-          Array.from(el.querySelectorAll('img[alt]'))
-            .map(img => img.getAttribute('alt') || '')
-            .filter(alt => alt.length > 5)
-        );
-        if (imgAlts.length > 0 && score <= 0 && bestCodeScore <= 0) {
-          foundCodePost += '\n[IMG ALT]: ' + imgAlts.join(' | ');
-        }
-      }
-    }
-
-    // ── แสดงผลลัพธ์ Console ─────────────────────────────────────────────────
-    const now    = new Date();
-    const thDate = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-    console.log(`\n📅 รายงานประจำวัน Heartopia — ${thDate}\n`);
-
-    if (foundResourcePost) {
-      console.log('🪨 ไม้โอ๊กและหินเรืองแสง');
-      foundResourcePost.split('\n').forEach((line: string) => {
-        const t = line.trim();
-        if (!t || t.length > 150) return;
-        if (/ไม้โอ๊ก|ไม้โอ๊ค|หินเรืองแสง/.test(t)) console.log(`   ${t}`);
-      });
-    } else {
-      console.log('🪨 ไม้โอ๊กและหินเรืองแสง\n   ❌ ไม่พบโพสต์วันนี้');
-    }
-
-    console.log('');
-    if (foundCodePost) {
-      console.log('🎁 โค้ด Redeem');
-      const rawCodes = parseCodes(foundCodePost);
-      if (rawCodes.length > 0) rawCodes.forEach(c => console.log(`   🔑 ${[c.code, c.detail, c.expiry].filter(Boolean).join(' ')}`));
-      else console.log('   ⚠️  โค้ดอยู่ในรูปภาพ — ดูจากหน้าจอ Browser ได้เลยครับ');
-    } else {
-      console.log('🎁 โค้ด Redeem\n   ❌ ไม่พบโพสต์วันนี้');
-    }
-
-    if (!foundResourcePost && !foundCodePost) {
-      console.log('🔍 DEBUG — ข้อความ 5 โพสต์แรก:');
-      const debugArticles = await page.locator(postSelector).all();
-      for (let i = 0; i < Math.min(debugArticles.length, 5); i++) {
-        const txt = await debugArticles[i].innerText().catch(() => '');
-        console.log(`\n--- โพสต์ ${i + 1} ---\n${txt.substring(0, 400).trim()}`);
-      }
-    }
-
-    // ── Step 3: บันทึกลง MongoDB Atlas ──────────────────────────────────────
-    console.log('\n💾 กำลังเชื่อมต่อ MongoDB Atlas...');
-    await connectDB();
-
+  try {
     const todayDate = getTodayDateString();
     const locations = parseLocations(foundResourcePost);
     const codes     = parseCodes(foundCodePost);
@@ -358,16 +218,8 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
         $set: {
           date: todayDate,
           scrapedAt: new Date(),
-          resources: {
-            found: !!foundResourcePost,
-            rawText: foundResourcePost,
-            locations,
-          },
-          codes: {
-            found: !!foundCodePost,
-            rawText: foundCodePost,
-            items: codes,
-          },
+          resources: { found: !!foundResourcePost, rawText: foundResourcePost, locations },
+          codes: { found: !!foundCodePost, rawText: foundCodePost, items: codes },
         },
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -376,10 +228,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
     console.log(`✅ บันทึกลง MongoDB สำเร็จ! (date: ${report?.date})`);
     console.log(`   📍 พิกัดแร่: ${locations.length} แห่ง`);
     console.log(`   🔑 โค้ด: ${codes.length} โค้ด`);
-
   } finally {
-    await context.close();
-    await browser.close();
     await disconnectDB();
   }
 });

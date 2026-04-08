@@ -33,9 +33,6 @@ Use this checklist to deploy an always-on setup where data is updated automatica
 Set these repository secrets:
 
 - MONGODB_URI
-- FB_AUTH_STATE_BASE64 (recommended)
-- FB_EMAIL (fallback login)
-- FB_PASSWORD (fallback login)
 - ALERT_EMAIL_TO
 - ALERT_EMAIL_FROM
 - SMTP_HOST

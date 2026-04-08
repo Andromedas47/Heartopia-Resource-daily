@@ -12,6 +12,7 @@ import {
 import { fetchLatestReport, fetchLocationMappings } from "../services/api";
 import type { LocationType } from "../types/heartopia";
 import styles from "./page.module.css";
+
 const MAP_IMAGE_SRC = process.env.HEARTOPIA_MAP_IMAGE_SRC ?? "/maps/image_0.png";
 const ENABLE_COORD_PICKER = process.env.NEXT_PUBLIC_MAP_COORD_PICKER !== "0";
 
@@ -36,6 +37,8 @@ export default async function Home() {
     fetchLatestReport(),
     fetchLocationMappings(),
   ]);
+
+  // ❌ ลบ export interface DailyReport ออกไปจากตรงนี้แล้วนะครับ
 
   const latestReport = latestResult.success ? (latestResult.data ?? null) : null;
   const locationMappings = mappingResult.success ? (mappingResult.data ?? []) : [];
@@ -83,6 +86,10 @@ export default async function Home() {
   const resourcesCount = mappedLocations.length;
   const codesCount = normalizedCodes.length;
   const reportDate = latestReport ? formatReportDate(latestReport.date) : "No report found";
+  
+  // ✅ จุดที่เพิ่ม: จัดฟอร์แมตวันที่อัปเดตโค้ด
+  const codeLastUpdated = latestReport?.codeLastUpdated ? formatReportDate(latestReport.codeLastUpdated) : null;
+  
   const scrapedAt = latestReport ? formatDateTime(latestReport.scrapedAt) : "Waiting for data";
   const healthLabel = latestReport
     ? latestReport.resources.found || latestReport.codes.found
@@ -195,9 +202,17 @@ export default async function Home() {
             )}
           </article>
 
+          {/* ✅ จุดที่เพิ่ม: กล่อง Redeem Codes แบบมีวันที่กำกับ */}
           <article className={styles.panel}>
             <header className={styles.panelHeader}>
-              <h3>Redeem Codes</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <h3 style={{ margin: 0 }}>Redeem Codes</h3>
+                {codeLastUpdated && (
+                  <span style={{ fontSize: "0.8rem", opacity: 0.7, fontWeight: "normal" }}>
+                    อัปเดตล่าสุด: {codeLastUpdated}
+                  </span>
+                )}
+              </div>
               <span>{codesCount} entries</span>
             </header>
             <CodesGrid items={normalizedCodes} />

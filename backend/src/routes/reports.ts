@@ -31,15 +31,36 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // ── GET /api/reports/latest ────────────────────────────────────────────────
-// รายงานล่าสุด (วันนี้ หรือวันล่าสุดที่มีข้อมูล)
+// รายงานล่าสุด (แร่วันนี้ + โค้ดล่าสุดที่มีการแจก)
 router.get('/latest', async (_req: Request, res: Response) => {
   try {
-    const report = await DailyReport.findOne().sort({ date: -1 });
-    if (!report) {
+    // 1. ดึงรายงานฉบับล่าสุด (เพื่อเอาพิกัดแร่ของวันนี้) 
+    // ใช้ .lean() เพื่อแปลงจาก Mongoose Object เป็น JSON Object ธรรมดา จะได้แก้ไขค่าง่ายๆ
+    const latestReport = await DailyReport.findOne().sort({ date: -1 }).lean();
+
+    if (!latestReport) {
       res.status(404).json({ success: false, error: 'No reports found' });
       return;
     }
-    res.json({ success: true, data: report });
+
+    // 2. ดึงรายงานฉบับล่าสุด "ที่เคยเจอโค้ด" (ย้อนอดีตไปหาใบที่มีโค้ด)
+    const latestCodeReport = await DailyReport.findOne({ "codes.found": true })
+      .sort({ date: -1 })
+      .lean();
+
+    // 3. ประกอบร่างข้อมูล (Fusion Data)
+    const fusionData = {
+      ...latestReport, // เอาข้อมูลของวันนี้มากางไว้ก่อน (ได้แร่ของวันนี้มาแล้ว)
+      
+      // เขียนทับหมวด codes ด้วยข้อมูลจากวันที่มีโค้ดแจกล่าสุด
+      codes: latestCodeReport ? latestCodeReport.codes : { found: false, items: [], rawText: '' },
+      
+      // ✨ เพิ่มตัวแปรใหม่ส่งไปให้หน้าเว็บ เพื่อบอกว่าโค้ดอัปเดตวันไหน
+      codeLastUpdated: latestCodeReport ? latestCodeReport.date : null
+    };
+
+    // ส่งข้อมูลที่ฟิวชั่นแล้วกลับไปให้ Vercel
+    res.json({ success: true, data: fusionData });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });
   }

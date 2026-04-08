@@ -14,6 +14,7 @@ export interface CodeItem {
 
 export interface DailyReport {
   date: string;
+  codeLastUpdated?: string | null;
   scrapedAt: string;
   resources: {
     found: boolean;

@@ -1,5 +1,6 @@
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 name: Daily Heartopia Scraper
 
 on:
@@ -25,13 +26,11 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Install Playwright Chromium
-        run: bunx playwright install chromium --with-deps
+      # ❌ ลบขั้นตอน Install Playwright Chromium ทิ้งไปแล้ว ประหยัดเวลาสุดๆ!
 
       - name: Run Scraper
         env:
-          FB_EMAIL: ${{ secrets.FB_EMAIL }}
-          FB_PASSWORD: ${{ secrets.FB_PASSWORD }}
+          # 🟢 เหลือแค่ 2 ตัวที่ต้องใช้จริงๆ
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          FB_AUTH_STATE_BASE64: ${{ secrets.FB_AUTH_STATE_BASE64 }}
+          APIFY_TOKEN: ${{ secrets.APIFY }} # 👈 ดึงจาก Secret ชื่อ APIFY ที่คุณพิชญ์ตั้งไว้ในเว็บ
         run: bun run scrape

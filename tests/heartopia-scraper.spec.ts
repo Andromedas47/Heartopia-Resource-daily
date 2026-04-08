@@ -28,6 +28,8 @@ function parseLocations(text: string): ILocation[] {
     const t = line.trim();
     if (!t || t.length > 150) continue;
 
+    if (t.startsWith('#')) continue;
+
     if (/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/.test(t)) {
       const cleaned = t.replace(/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/g, '');
       pushLocation('oak', cleaned || t);
@@ -45,7 +47,7 @@ function parseCodes(text: string): ICode[] {
   const lines = text.split('\n');
 
   const codePattern = /(?:^|[\s:•·*\-])([a-zA-Z0-9][a-zA-Z0-9_-]{5,23})(?=$|[\s),.])/g;
-  const sectionHint = /โค้ดที่ยังใช้งานได้|รวมโค้ดทั้งหมด|โค้ดใหม่|redeem|code|keepsmiling/i;
+  const sectionHint = /รวมโค้ดทั้งหมด|โค้ดเพิ่งค้นพบ|มาใหม่ล่าสุด|โค้ดที่ยังใช้งานได้|อัปเดตโค้ด/i;
   const skipLine = /\[IMG ALT\]|วิธีเติม|TAB|คอมเมนต์|#DailyHeartopia|#Heartopia|#แจกโค้ด/i;
   const noiseToken = /^(heartopia|dailyheartopia|facebook|reels|photo|photos|img|alt|www|http|check)$/i;
   const noiseTailMarkers = ['ความรู้สึกทั้งหมด', 'ความคิดเห็น', 'แชร์', 'ถูกใจ', 'แสดงความคิดเห็น', 'ดู '];
@@ -78,7 +80,7 @@ function parseCodes(text: string): ICode[] {
     if (!line) continue;
     if (sectionHint.test(line)) enteredCodeSection = true;
     if (skipLine.test(line)) continue;
-    if (/^#/.test(line)) break;
+    if (/^#/.test(line)) continue;
     if (!enteredCodeSection && !/\d/.test(line)) continue;
 
     const expiryMatch = line.match(/หมดเขต[^\n]*/i);
@@ -167,7 +169,14 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
 
   // ── นำข้อความที่ได้มาเข้าเครื่องกรองของคุณพิชญ์ ─────────────────────────
   const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน', 'แร่', 'พิกัด'];
-  const codePostTriggers = ['โค้ดใหม่', 'โค้ด', 'มาแล้วค่าา', 'code', 'แจก', 'keepsmiling', 'redeem', 'เคลม', 'โค้ดที่ยังใช้งานได้', 'รหัส'];
+  const codePostTriggers = [
+      'อัปเดตโค้ด', 
+      'รวมโค้ดทั้งหมด', 
+      'โค้ดที่ยังใช้งานได้', 
+      'โค้ดเพิ่งค้นพบ', 
+      'รหัสแลก', 
+      'แจกโค้ด'
+    ];
 
   let foundResourcePost = '';
   let foundCodePost     = '';
@@ -190,6 +199,8 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
     console.log('🪨 ไม้โอ๊กและหินเรืองแสง');
     foundResourcePost.split('\n').forEach((line: string) => {
       const t = line.trim();
+      if (!t || t.length > 150) return;
+      if (t.startsWith('#')) return;
       if (/ไม้โอ๊ก|ไม้โอ๊ค|หินเรืองแสง/.test(t)) console.log(`   ${t}`);
     });
   } else {

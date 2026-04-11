@@ -38,8 +38,6 @@ export default async function Home() {
     fetchLocationMappings(),
   ]);
 
-  // ❌ ลบ export interface DailyReport ออกไปจากตรงนี้แล้วนะครับ
-
   const latestReport = latestResult.success ? (latestResult.data ?? null) : null;
   const locationMappings = mappingResult.success ? (mappingResult.data ?? []) : [];
 
@@ -87,12 +85,11 @@ export default async function Home() {
   const codesCount = normalizedCodes.length;
   const reportDate = latestReport ? formatReportDate(latestReport.date) : "No report found";
   
-  // ✅ จุดที่เพิ่ม: จัดฟอร์แมตวันที่อัปเดตโค้ด
   const codeLastUpdated = latestReport?.codeLastUpdated ? formatReportDate(latestReport.codeLastUpdated) : null;
   
   const scrapedAt = latestReport ? formatDateTime(latestReport.scrapedAt) : "Waiting for data";
   const healthLabel = latestReport
-    ? latestReport.resources.found || latestReport.codes.found
+    ? (latestReport?.resources?.found || latestReport?.codes?.found)
       ? "Ready"
       : "Empty"
     : "Offline";

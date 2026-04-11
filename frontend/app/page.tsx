@@ -46,15 +46,15 @@ export default async function Home() {
   const dataError = latestReport === null ? latestResult.error ?? "Unable to load dashboard data." : null;
 
   const normalizedLocations =
-    latestReport?.resources.locations
-      .map((location) => ({
+    latestReport?.resources?.locations
+      ?.map((location) => ({
         ...location,
         name: sanitizeLocationName(location.cleanedLocationName || location.name),
       }))
       .filter((location) => location.name.length > 0 && !location.name.includes('#')) ?? [];
 
   const normalizedCodes =
-    latestReport?.codes.items.filter((item) => item.code.trim().length > 0) ?? [];
+    latestReport?.codes?.items?.filter((item) => item.code.trim().length > 0) ?? [];
 
   const locationLookup = buildLocationMappingLookup(locationMappings);
   const staticLookup = buildStaticMappingLookup();
@@ -81,7 +81,7 @@ export default async function Home() {
     ...(UNKNOWN_ICON_SRC ? { unknown: UNKNOWN_ICON_SRC } : {}),
   };
 
-  const inGameWeather = parseInGameWeather(latestReport?.resources.rawText ?? "");
+  const inGameWeather = parseInGameWeather(latestReport?.resources?.rawText ?? "");
 
   const resourcesCount = mappedLocations.length;
   const codesCount = normalizedCodes.length;

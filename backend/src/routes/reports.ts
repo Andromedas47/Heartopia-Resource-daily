@@ -36,7 +36,12 @@ router.get('/latest', async (_req: Request, res: Response) => {
   try {
     // 1. ดึงรายงานฉบับล่าสุด (เพื่อเอาพิกัดแร่ของวันนี้) 
     // ใช้ .lean() เพื่อแปลงจาก Mongoose Object เป็น JSON Object ธรรมดา จะได้แก้ไขค่าง่ายๆ
-    const latestReport = await DailyReport.findOne({ "resources.found": true }).sort({ date: -1 });
+    const latestReport = await DailyReport.findOne({
+      $or: [
+        { "resources.found": true },
+        { "codes.found": true }
+      ]
+    }).sort({ date: -1 }).lean();
 
     if (!latestReport) {
       res.status(404).json({ success: false, error: 'No reports found' });

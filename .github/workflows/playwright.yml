@@ -29,8 +29,9 @@ jobs:
       # ❌ ลบขั้นตอน Install Playwright Chromium ทิ้งไปแล้ว ประหยัดเวลาสุดๆ!
 
       - name: Run Scraper
+        run: bun run scrape # หรือ npm run scrape ของคุณ
         env:
-          # 🟢 เหลือแค่ 2 ตัวที่ต้องใช้จริงๆ
+          TZ: "Asia/Bangkok" # 👈 เพิ่มบรรทัดนี้ลงไป
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           APIFY_TOKEN: ${{ secrets.APIFY }} # 👈 ดึงจาก Secret ชื่อ APIFY ที่คุณพิชญ์ตั้งไว้ในเว็บ
         run: bun run scrape

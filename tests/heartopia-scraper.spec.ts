@@ -1,11 +1,23 @@
 import { test } from '@playwright/test'; // 👈 นำเข้าแค่ test ก็พอ ไม่ต้องใช้ chromium แล้ว
 import path from 'path';
+import assert from 'node:assert/strict';
 import dotenv from 'dotenv';
 import { DailyReport, ILocation, ICode } from '../src/models/DailyReport';
 import { connectDB, disconnectDB } from '../src/db';
 import { cleanLocationName } from '../backend/src/utils/cleanLocationName';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+const RESOURCE_LINE_PATTERNS: Array<{ type: ILocation['type']; regex: RegExp }> = [
+  {
+    type: 'oak',
+    regex: /^[\s:*\-\u2022\u00b7]*?(?:ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค)\s*(?:[:\-*•·]?\s*)?(.*)$/i,
+  },
+  {
+    type: 'glowstone',
+    regex: /^[\s:*\-\u2022\u00b7]*?หินเรืองแสง\s*(?:[:\-*•·]?\s*)?(.*)$/i,
+  },
+];
 
 // ── Helper: ของคุณพิชญ์ (เหมือนเดิม 100%) ────────────────────────────────────
 function parseLocations(text: string): ILocation[] {
@@ -30,6 +42,20 @@ function parseLocations(text: string): ILocation[] {
 
     if (t.startsWith('#')) continue;
 
+    let matchedFlexiblePattern = false;
+    for (const pattern of RESOURCE_LINE_PATTERNS) {
+      const match = t.match(pattern.regex);
+      if (!match) continue;
+
+      matchedFlexiblePattern = true;
+      const candidateLocation = match[1]?.trim() ?? '';
+      if (candidateLocation) {
+        pushLocation(pattern.type, candidateLocation);
+      }
+      break;
+    }
+    if (matchedFlexiblePattern) continue;
+
     if (/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/.test(t)) {
       const cleaned = t.replace(/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/g, '');
       pushLocation('oak', cleaned || t);
@@ -40,6 +66,29 @@ function parseLocations(text: string): ILocation[] {
   }
   return locations;
 }
+
+test('parseLocations supports flexible resource line formats', () => {
+  const rawText = [
+    'ไม้โอ๊ก: หน้าบ้านหมายเลข 02',
+    'ไม้โอ๊ก - หน้าบ้านหมายเลข 02',
+    'ต้นไม้โอ๊ก หน้าบ้านหมายเลข 03',
+    'ไม้โอ๊ค หน้าบ้านหมายเลข 04',
+    'หินเรืองแสง: หน้าบ้านหมายเลข 08',
+    '• ไม้โอ๊ก: หน้าบ้านหมายเลข 05',
+    '#ไม้โอ๊ก: หน้าบ้านหมายเลข 06',
+    'ไม้โอ๊ก:',
+    'หินเรืองแสง - ',
+    'หินเรืองแสง หน้าบ้านหมายเลข 08',
+  ].join('\n');
+
+  assert.deepStrictEqual(parseLocations(rawText), [
+    { type: 'oak', name: 'หน้าบ้านหมายเลข 02', cleanedLocationName: 'หน้าบ้านหมายเลข 02' },
+    { type: 'oak', name: 'หน้าบ้านหมายเลข 03', cleanedLocationName: 'หน้าบ้านหมายเลข 03' },
+    { type: 'oak', name: 'หน้าบ้านหมายเลข 04', cleanedLocationName: 'หน้าบ้านหมายเลข 04' },
+    { type: 'glowstone', name: 'หน้าบ้านหมายเลข 08', cleanedLocationName: 'หน้าบ้านหมายเลข 08' },
+    { type: 'oak', name: 'หน้าบ้านหมายเลข 05', cleanedLocationName: 'หน้าบ้านหมายเลข 05' },
+  ]);
+});
 
 function parseCodes(text: string): ICode[] {
   const codes: ICode[] = [];

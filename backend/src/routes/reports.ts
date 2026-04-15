@@ -36,7 +36,7 @@ router.get('/latest', async (_req: Request, res: Response) => {
   try {
     const weatherPattern = /(สภาพอากาศวันนี้|พยากรณ์อากาศ|อากาศวันนี้|weather)/i;
 
-    const [latestAnyReport, latestResourceReport, latestWeatherReport, latestCodeReport] = await Promise.all([
+    const [latestAnyReport, latestResourceReport, latestWeatherCandidates, latestCodeReport] = await Promise.all([
       DailyReport.findOne({
         $or: [
           { 'resources.found': true },
@@ -48,15 +48,20 @@ router.get('/latest', async (_req: Request, res: Response) => {
       DailyReport.findOne({ 'resources.locations.0': { $exists: true } })
         .sort({ date: -1 })
         .lean(),
-      DailyReport.findOne({
-        'resources.rawText': { $regex: weatherPattern },
+      DailyReport.find({
+        'resources.rawText': { $type: 'string', $ne: '' },
       })
         .sort({ date: -1 })
+        .limit(60)
+        .select('date resources')
         .lean(),
       DailyReport.findOne({ 'codes.items.0': { $exists: true } })
         .sort({ date: -1 })
         .lean(),
     ]);
+
+    const latestWeatherReport =
+      latestWeatherCandidates.find((report) => weatherPattern.test(report.resources?.rawText ?? '')) ?? null;
 
     const baseReport = latestAnyReport ?? latestResourceReport ?? latestWeatherReport ?? latestCodeReport;
 

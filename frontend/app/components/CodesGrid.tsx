@@ -37,73 +37,49 @@ function weatherIcon(text: string): string {
 }
 
 export function InGameWeather({ today, forecast }: InGameWeatherProps) {
-  const [query, setQuery] = useState("");
-
-  const filteredToday = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return today;
-    return today.filter((item) => item.toLowerCase().includes(keyword));
-  }, [today, query]);
-
-  const filteredForecast = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return forecast;
-    return forecast.filter((item) => item.toLowerCase().includes(keyword));
-  }, [forecast, query]);
-
   const totalEntries = today.length + forecast.length;
+  const allEntries = [...today, ...forecast].filter((entry) => entry.trim().length > 0);
+  const primary = allEntries[0] ?? "No weather data";
+  const secondaryA = allEntries[1] ?? "Humidity data unavailable";
+  const secondaryB = allEntries[2] ?? "Wind data unavailable";
+  const forecastSlots = allEntries.slice(0, 3);
+
+  const slotLabels = ["Morning", "Afternoon", "Evening"];
 
   return (
     <div className={styles.weatherCard}>
-      <header className={styles.weatherHeader}>
-        <h3>🌦️ In-Game Weather</h3>
-        <span>{totalEntries} notes</span>
-      </header>
-
-      <div className={styles.weatherSearchRow}>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search weather notes"
-          aria-label="Search in-game weather notes"
-        />
-      </div>
-
       {totalEntries === 0 ? (
         <p className={styles.weatherEmpty}>No weather details found in latest post.</p>
       ) : (
-        <div className={styles.weatherColumns}>
-          <section>
-            <h4>Today</h4>
-            {filteredToday.length > 0 ? (
-              <ul>
-                {filteredToday.map((item, index) => (
-                  <li key={`today-${index}`}>
-                    <span aria-hidden>{weatherIcon(item)}</span>
-                    <p>{item}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.weatherSmallEmpty}>No today result for this keyword.</p>
-            )}
-          </section>
+        <div className={styles.weatherLayout}>
+          <div className={styles.weatherMain}>
+            <div className={styles.weatherMainIcon} aria-hidden>
+              {weatherIcon(primary)}
+            </div>
 
-          <section>
-            <h4>Forecast</h4>
-            {filteredForecast.length > 0 ? (
-              <ul>
-                {filteredForecast.map((item, index) => (
-                  <li key={`forecast-${index}`}>
-                    <span aria-hidden>{weatherIcon(item)}</span>
-                    <p>{item}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.weatherSmallEmpty}>No forecast result for this keyword.</p>
-            )}
-          </section>
+            <div className={styles.weatherMainText}>
+              <p className={styles.weatherPrimary}>{primary}</p>
+              <p>Live game weather note</p>
+            </div>
+
+            <div className={styles.weatherMeta}>
+              <span>{secondaryA}</span>
+              <span>{secondaryB}</span>
+            </div>
+          </div>
+
+          <div className={styles.weatherSlots}>
+            {slotLabels.map((label, index) => {
+              const slotValue = forecastSlots[index] ?? "-";
+              return (
+                <article key={label} className={styles.weatherSlot}>
+                  <span>{label}</span>
+                  <strong aria-hidden>{weatherIcon(slotValue)}</strong>
+                  <p>{slotValue}</p>
+                </article>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -169,22 +145,24 @@ export default function CodesGrid({ items }: { items: CodeItem[] }) {
       <ul className={styles.grid}>
         {cleanItems.map((item, index) => (
           <li key={`${item.code}-${index}`} className={styles.card}>
+            {index < 2 ? <span className={styles.newBadge}>New</span> : null}
             <div className={styles.codeRow}>
               <strong>{item.code}</strong>
               <button
                 type="button"
                 className={styles.copyButton}
                 onClick={() => void copyToClipboard(item.code, `Copied ${item.code}`)}
+                aria-label={`Copy ${item.code}`}
               >
-                Copy
+                ⧉
               </button>
             </div>
 
             {item.detail || item.expiry ? (
               <p className={styles.meta}>
                 {item.detail ? item.detail : null}
-                {item.detail && item.expiry ? " | " : null}
-                {item.expiry ? `Expiry ${item.expiry}` : null}
+                {item.detail && item.expiry ? " · " : null}
+                {item.expiry ? `Expires ${item.expiry}` : null}
               </p>
             ) : null}
           </li>

@@ -51,6 +51,12 @@ function markerLabel(type: MarkerType): string {
   return "Unknown";
 }
 
+function markerBadgeClass(type: MarkerType): string {
+  if (type === "oak") return styles.badgeOak;
+  if (type === "glowstone") return styles.badgeGlowstone;
+  return styles.badgeUnknown;
+}
+
 export default function ResourceMap({
   markers,
   missingLocationNames = [],
@@ -180,6 +186,17 @@ export default function ResourceMap({
               style={{ left: `${lastPicked.xPercent}%`, top: `${lastPicked.yPercent}%` }}
               aria-hidden
             />
+          ) : null}
+
+          {markers.length > 0 ? (
+            <ul className={styles.legend}>
+              {markers.slice(0, 8).map((marker) => (
+                <li key={`${marker.id}-legend`} className={`${styles.legendItem} ${markerBadgeClass(marker.type)}`}>
+                  <span aria-hidden>{markerIcon(marker.type)}</span>
+                  <p>{marker.name}</p>
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
       </div>

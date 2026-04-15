@@ -1,5 +1,9 @@
-import CodesGrid, { InGameWeather } from "./components/CodesGrid";
-import ResourceMap, { type ResourceMarker } from "./components/ResourceMap";
+import { Footer } from "@/components/footer";
+import { Header } from "@/components/header";
+import { MapSection } from "@/components/map-section";
+import { RedeemCodes } from "@/components/redeem-codes";
+import { ResourceLocations } from "@/components/resource-locations";
+import { WeatherSection } from "@/components/weather-section";
 import {
   buildLocationMappingLookup,
   buildStaticMappingLookup,
@@ -10,27 +14,8 @@ import {
   sanitizeLocationName,
 } from "../lib/heartopiaData";
 import { fetchLatestReport, fetchLocationMappings } from "../services/api";
-import type { LocationType } from "../types/heartopia";
-import styles from "./page.module.css";
 
 const MAP_IMAGE_SRC = process.env.HEARTOPIA_MAP_IMAGE_SRC ?? "/maps/image_0.png";
-const ENABLE_COORD_PICKER = process.env.NEXT_PUBLIC_MAP_COORD_PICKER !== "0";
-
-const OAK_ICON_SRC = process.env.NEXT_PUBLIC_MAP_OAK_ICON_SRC ?? "/icons/Roaming%20Oak%20Tree.png";
-const GLOW_ICON_SRC = process.env.NEXT_PUBLIC_MAP_GLOWSTONE_ICON_SRC ?? "/icons/Glowstone.png";
-const UNKNOWN_ICON_SRC = process.env.NEXT_PUBLIC_MAP_UNKNOWN_ICON_SRC;
-
-function locationTypeLabel(type: LocationType): string {
-  if (type === "oak") return "Oak";
-  if (type === "glowstone") return "Glowstone";
-  return "Unknown";
-}
-
-function locationTypeIcon(type: LocationType): string {
-  if (type === "oak") return "🌳";
-  if (type === "glowstone") return "✨";
-  return "📍";
-}
 
 export default async function Home() {
   const [latestResult, mappingResult] = await Promise.all([
@@ -40,8 +25,6 @@ export default async function Home() {
 
   const latestReport = latestResult.success ? (latestResult.data ?? null) : null;
   const locationMappings = mappingResult.success ? (mappingResult.data ?? []) : [];
-
-  const dataError = latestReport === null ? latestResult.error ?? "Unable to load dashboard data." : null;
 
   const normalizedLocations =
     latestReport?.resources?.locations
@@ -61,172 +44,70 @@ export default async function Home() {
     .filter((location) => location.source === "missing")
     .map((location) => location.name);
 
-  const mapMarkers: ResourceMarker[] = mappedLocations
+  const inGameWeather = parseInGameWeather(latestReport?.resources?.rawText ?? "");
+  const reportDate = latestReport ? formatReportDate(latestReport.date) : "No report found";
+  const codeLastUpdated = latestReport?.codeLastUpdated ? formatReportDate(latestReport.codeLastUpdated) : undefined;
+  const scrapedAt = latestReport ? formatDateTime(latestReport.scrapedAt) : "Waiting for data";
+
+  const resourceItems = mappedLocations.map((location) => ({
+    name: location.name,
+    type: location.type,
+    source: location.source,
+    mappedBy: location.mappedBy,
+  }));
+
+  const codeItems = normalizedCodes.map((item, index) => ({
+    code: item.code,
+    rewards: item.detail || "No reward details",
+    expires: item.expiry || "No expiry info",
+    isNew: index < 2,
+  }));
+
+  const mapMarkers = mappedLocations
     .filter((location) => location.x !== null && location.y !== null)
     .map((location, index) => ({
       id: `${location.normalizedName}-${index}`,
       name: location.name,
-      type: location.type,
       x: location.x ?? 0,
       y: location.y ?? 0,
-      source: location.source === "database" ? "database" : "fallback",
-      mappedBy: location.mappedBy,
+      type: location.type,
     }));
 
-  const markerIconAssets: Partial<Record<ResourceMarker["type"], string>> = {
-    ...(OAK_ICON_SRC ? { oak: OAK_ICON_SRC } : {}),
-    ...(GLOW_ICON_SRC ? { glowstone: GLOW_ICON_SRC } : {}),
-    ...(UNKNOWN_ICON_SRC ? { unknown: UNKNOWN_ICON_SRC } : {}),
-  };
-
-  const inGameWeather = parseInGameWeather(latestReport?.resources?.rawText ?? "");
-
-  const resourcesCount = mappedLocations.length;
-  const codesCount = normalizedCodes.length;
-  const reportDate = latestReport ? formatReportDate(latestReport.date) : "No report found";
-  
-  const codeLastUpdated = latestReport?.codeLastUpdated ? formatReportDate(latestReport.codeLastUpdated) : null;
-  
-  const scrapedAt = latestReport ? formatDateTime(latestReport.scrapedAt) : "Waiting for data";
-  const healthLabel = latestReport
-    ? (latestReport?.resources?.found || latestReport?.codes?.found)
-      ? "Ready"
-      : "Empty"
-    : "Offline";
+  const dataError = latestReport === null ? latestResult.error ?? "Unable to load dashboard data." : null;
 
   return (
-    <div className={styles.page}>
-      <main className={styles.dashboard}>
-        <section className={styles.hero}>
-          <div>
-            <p className={styles.eyebrow}>Heartopia Daily</p>
-            <h1>Result Dashboard</h1>
-          </div>
-          <div className={styles.heroTagWrap}>
-            <span className={styles.heroTag}>{healthLabel}</span>
-          </div>
-        </section>
+    <div className="min-h-screen bg-background">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute top-10 -left-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl sm:h-64 sm:w-64" />
+        <div className="absolute top-20 -right-32 h-64 w-64 rounded-full bg-accent/10 blur-3xl sm:h-96 sm:w-96" />
+        <div className="absolute -bottom-20 left-1/4 h-48 w-48 rounded-full bg-chart-3/5 blur-3xl sm:h-80 sm:w-80" />
+      </div>
 
+      <Header reportDate={reportDate} lastScraped={scrapedAt} />
+
+      <main className="container mx-auto grid max-w-6xl gap-6 px-3 py-6 sm:gap-8 sm:px-4 sm:py-8 md:gap-10">
         {dataError ? (
-          <div className={styles.errorBanner}>
-            <h2>Dashboard data is unavailable</h2>
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <p className="font-semibold">Dashboard data is unavailable</p>
             <p>{dataError}</p>
           </div>
         ) : null}
 
-        <section className={styles.weatherArea}>
-          <InGameWeather today={inGameWeather.today} forecast={inGameWeather.forecast} />
-        </section>
+        <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
+          <WeatherSection today={inGameWeather.today} forecast={inGameWeather.forecast} />
+          <ResourceLocations items={resourceItems} />
+        </div>
 
-        <section className={styles.kpiGrid} aria-label="Dashboard summary">
-          <article className={styles.kpiCard}>
-            <div className={styles.kpiHeading}>
-              <span className={styles.kpiIcon} aria-hidden>
-                🗓️
-              </span>
-              <p>Latest Report Date</p>
-            </div>
-            <h2>{reportDate}</h2>
-            <small>Most recent report in database</small>
-          </article>
-          <article className={styles.kpiCard}>
-            <div className={styles.kpiHeading}>
-              <span className={styles.kpiIcon} aria-hidden>
-                🪨
-              </span>
-              <p>Resource Locations</p>
-            </div>
-            <h2>{resourcesCount}</h2>
-            <small>Found in latest scrape</small>
-          </article>
-          <article className={styles.kpiCard}>
-            <div className={styles.kpiHeading}>
-              <span className={styles.kpiIcon} aria-hidden>
-                🎁
-              </span>
-              <p>Redeem Codes</p>
-            </div>
-            <h2>{codesCount}</h2>
-            <small>Available in latest scrape</small>
-          </article>
-          <article className={styles.kpiCard}>
-            <div className={styles.kpiHeading}>
-              <span className={styles.kpiIcon} aria-hidden>
-                ⏱️
-              </span>
-              <p>Last Scraped At</p>
-            </div>
-            <h2>{scrapedAt}</h2>
-            <small>Status: {healthLabel}</small>
-          </article>
-        </section>
+        <RedeemCodes items={codeItems} lastUpdated={codeLastUpdated} />
 
-        <section className={styles.contentGrid}>
-          <article className={styles.panel}>
-            <header className={styles.panelHeader}>
-              <h3>Resource Locations</h3>
-              <span>{resourcesCount} entries</span>
-            </header>
-            {resourcesCount > 0 ? (
-              <ul className={styles.locationList}>
-                {mappedLocations.map((location, index) => {
-                  const typeClassName =
-                    location.type === "oak"
-                      ? styles.typePillOak
-                      : location.type === "glowstone"
-                        ? styles.typePillGlowstone
-                        : styles.typePillUnknown;
-
-                  return (
-                    <li key={`${location.name}-${index}`}>
-                      <span className={styles.locationName}>
-                        <span className={styles.locationIcon} aria-hidden>
-                          {locationTypeIcon(location.type)}
-                        </span>
-                        {location.name}
-                      </span>
-                      <div className={styles.locationMeta}>
-                        <span className={`${styles.typePill} ${typeClassName}`}>
-                          {locationTypeLabel(location.type)}
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className={styles.emptyState}>No locations available in the latest report.</p>
-            )}
-          </article>
-
-          {/* ✅ จุดที่เพิ่ม: กล่อง Redeem Codes แบบมีวันที่กำกับ */}
-          <article className={styles.panel}>
-            <header className={styles.panelHeader}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                <h3 style={{ margin: 0 }}>Redeem Codes</h3>
-                {codeLastUpdated && (
-                  <span style={{ fontSize: "0.8rem", opacity: 0.7, fontWeight: "normal" }}>
-                    อัปเดตล่าสุด: {codeLastUpdated}
-                  </span>
-                )}
-              </div>
-              <span>{codesCount} entries</span>
-            </header>
-            <CodesGrid items={normalizedCodes} />
-          </article>
-        </section>
-
-        <section className={styles.mapSection}>
-          <ResourceMap
-            markers={mapMarkers}
-            missingLocationNames={missingLocationNames}
-            mapImageSrc={MAP_IMAGE_SRC}
-            mapNaturalSize={{ width: 1024, height: 1024 }}
-            iconAssets={markerIconAssets}
-            enableCoordinatePicker={ENABLE_COORD_PICKER}
-          />
-        </section>
+        <MapSection
+          markers={mapMarkers}
+          missingLocationNames={missingLocationNames}
+          mapImageSrc={MAP_IMAGE_SRC}
+        />
       </main>
+
+      <Footer />
     </div>
   );
 }

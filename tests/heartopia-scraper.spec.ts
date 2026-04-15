@@ -19,6 +19,12 @@ const RESOURCE_LINE_PATTERNS: Array<{ type: ILocation['type']; regex: RegExp }> 
   },
 ];
 
+function stripLeadingDecorations(value: string): string {
+  return (value ?? '')
+    .replace(/^[\s:•·*\-–—🌳💎✨🌤🌦🌠☀️☁️❄️🌈🔮]+/u, '')
+    .trim();
+}
+
 // ── Helper: ของคุณพิชญ์ (เหมือนเดิม 100%) ────────────────────────────────────
 function parseLocations(text: string): ILocation[] {
   const locations: ILocation[] = [];
@@ -26,7 +32,7 @@ function parseLocations(text: string): ILocation[] {
   const seen = new Set<string>();
 
   const pushLocation = (type: ILocation['type'], value: string): void => {
-    const cleanedLocationName = cleanLocationName(value);
+    const cleanedLocationName = cleanLocationName(stripLeadingDecorations(value));
     if (!cleanedLocationName) return;
 
     const key = `${type}:${cleanedLocationName.toLowerCase()}`;
@@ -42,9 +48,12 @@ function parseLocations(text: string): ILocation[] {
 
     if (t.startsWith('#')) continue;
 
+    const candidateLine = stripLeadingDecorations(t);
+    if (!candidateLine) continue;
+
     let matchedFlexiblePattern = false;
     for (const pattern of RESOURCE_LINE_PATTERNS) {
-      const match = t.match(pattern.regex);
+      const match = candidateLine.match(pattern.regex);
       if (!match) continue;
 
       matchedFlexiblePattern = true;
@@ -56,12 +65,12 @@ function parseLocations(text: string): ILocation[] {
     }
     if (matchedFlexiblePattern) continue;
 
-    if (/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/.test(t)) {
-      const cleaned = t.replace(/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/g, '');
-      pushLocation('oak', cleaned || t);
-    } else if (/หินเรืองแสง/.test(t)) {
-      const cleaned = t.replace(/หินเรืองแสง/g, '');
-      pushLocation('glowstone', cleaned || t);
+    if (/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/.test(candidateLine)) {
+      const cleaned = candidateLine.replace(/ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/g, '');
+      pushLocation('oak', cleaned || candidateLine);
+    } else if (/หินเรืองแสง/.test(candidateLine)) {
+      const cleaned = candidateLine.replace(/หินเรืองแสง/g, '');
+      pushLocation('glowstone', cleaned || candidateLine);
     }
   }
   return locations;
@@ -170,6 +179,40 @@ function getTodayDateString(): string {
   return new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+function scoreResourcePost(text: string): number {
+  if (!text) return Number.NEGATIVE_INFINITY;
+
+  const hasOak = /ต้นไม้โอ๊ก|ไม้โอ๊ก|ไม้โอ๊ค/i.test(text);
+  const hasGlowstone = /หินเรืองแสง/i.test(text);
+  const hasWeather = /สภาพอากาศวันนี้|พยากรณ์อากาศ|อากาศวันนี้/i.test(text);
+  const hasResourceHeader = /พิกัดทรัพยากร|สรุปข้อมูลสำคัญ/i.test(text);
+  const hasFurnitureOnly = /แจกแปลน|furniture|wardrobe|gothic/i.test(text) && !(hasOak || hasGlowstone);
+  const locationCount = parseLocations(text).length;
+
+  let score = 0;
+  if (hasOak && hasGlowstone) score += 80;
+  if (hasResourceHeader) score += 35;
+  if (hasWeather) score += 25;
+  score += locationCount * 20;
+  if (hasFurnitureOnly) score -= 50;
+
+  return score;
+}
+
+function scoreCodePost(text: string): number {
+  if (!text) return Number.NEGATIVE_INFINITY;
+
+  const codeCount = parseCodes(text).length;
+  const hasCodeHeader = /โค้ดวันนี้|อัปเดตโค้ด|รวมโค้ดทั้งหมด|รหัสแลก|แจกโค้ด/i.test(text);
+  const hasRedeemGuide = /TAB|ตั้งค่า|วิธีเติม/i.test(text);
+
+  let score = codeCount * 25;
+  if (hasCodeHeader) score += 30;
+  if (hasRedeemGuide) score += 10;
+
+  return score;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด (ผ่าน Apify) → บันทึกลง MongoDB', async () => {
   test.setTimeout(120000); // ให้เวลาบอท Apify วิ่งสัก 2 นาที
@@ -197,7 +240,7 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         "captionText": false,
-        "resultsLimit": 10,
+        "resultsLimit": 3,
         "startUrls": [
           { "url": "https://www.facebook.com/DailyHeartopia/" }
         ]
@@ -217,27 +260,33 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
   }
 
   // ── นำข้อความที่ได้มาเข้าเครื่องกรองของคุณพิชญ์ ─────────────────────────
-  const orePostTriggers  = ['สรุปข้อมูลสำคัญ', 'ตำแหน่ง', 'ไม้โอ๊ก', 'ไม้โอ๊ค', 'หินเรืองแสง', 'ต้นไม้โอ๊ก', 'ประจำวัน', 'แร่', 'พิกัด'];
-  const codePostTriggers = [
-      'อัปเดตโค้ด', 
-      'รวมโค้ดทั้งหมด', 
-      'โค้ดที่ยังใช้งานได้', 
-      'โค้ดเพิ่งค้นพบ', 
-      'รหัสแลก', 
-      'แจกโค้ด'
-    ];
-
   let foundResourcePost = '';
   let foundCodePost     = '';
+  let bestResourceScore = Number.NEGATIVE_INFINITY;
+  let bestCodeScore = Number.NEGATIVE_INFINITY;
 
   for (const post of posts) {
     const fullText = post.text || ''; // ดึงข้อความออกมาจาก JSON
 
-    const isOrePost  = orePostTriggers.some(kw => fullText.includes(kw));
-    const isCodePost = codePostTriggers.some(kw => fullText.toLowerCase().includes(kw.toLowerCase()));
+    const resourceScore = scoreResourcePost(fullText);
+    if (resourceScore > bestResourceScore) {
+      bestResourceScore = resourceScore;
+      foundResourcePost = fullText;
+    }
 
-    if (isOrePost && !foundResourcePost) foundResourcePost = fullText;
-    if (isCodePost && !foundCodePost) foundCodePost = fullText;
+    const codeScore = scoreCodePost(fullText);
+    if (codeScore > bestCodeScore) {
+      bestCodeScore = codeScore;
+      foundCodePost = fullText;
+    }
+  }
+
+  if (bestResourceScore < 20) {
+    foundResourcePost = '';
+  }
+
+  if (bestCodeScore < 20) {
+    foundCodePost = '';
   }
 
   // ── แสดงผลลัพธ์ Console ─────────────────────────────────────────────────

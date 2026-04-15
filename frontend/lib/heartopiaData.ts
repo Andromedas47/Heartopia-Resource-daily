@@ -7,7 +7,7 @@ import type {
 } from "../types/heartopia";
 
 export function sanitizeLocationName(value: string): string {
-  return value
+  const cleaned = value
     .replace(/\u00a0/g, " ")
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/^[:\s\-–—•·]+/, "")
@@ -15,6 +15,17 @@ export function sanitizeLocationName(value: string): string {
     .replace(/โ\s+โอ๊ก/g, "โอ๊ก")
     .replace(/วิญญาน/g, "วิญญาณ")
     .trim();
+
+  // Some bad imports stored Thai as question marks, e.g. "??????????????? 08".
+  // Recover to a stable zone label so mapping and display remain usable.
+  if (cleaned.includes("?")) {
+    const zoneMatch = cleaned.match(/(\d{1,2})\s*$/);
+    if (zoneMatch) {
+      return `หน้าบ้านหมายเลข ${zoneMatch[1].padStart(2, "0")}`;
+    }
+  }
+
+  return cleaned;
 }
 
 export function normalizeLocationName(value: string): string {

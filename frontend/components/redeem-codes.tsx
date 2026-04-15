@@ -35,7 +35,7 @@ export function RedeemCodes({ items, lastUpdated }: RedeemCodesProps) {
           </div>
           Redeem Codes
             {lastUpdated ? (
-              <span className="hidden text-xs font-normal text-muted-foreground sm:inline">Updated {lastUpdated}</span>
+              <span className="hidden text-xs font-normal text-muted-foreground sm:inline">Codes updated {lastUpdated}</span>
             ) : null}
           <span className="ml-auto text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 sm:py-1 rounded-full">
               {items.length} active

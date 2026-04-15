@@ -34,37 +34,57 @@ router.get('/', async (req: Request, res: Response) => {
 // รายงานล่าสุด (แร่วันนี้ + โค้ดล่าสุดที่มีการแจก)
 router.get('/latest', async (_req: Request, res: Response) => {
   try {
-    // 1. ดึงรายงานฉบับล่าสุด (เพื่อเอาพิกัดแร่ของวันนี้) 
-    // ใช้ .lean() เพื่อแปลงจาก Mongoose Object เป็น JSON Object ธรรมดา จะได้แก้ไขค่าง่ายๆ
-    const latestReport = await DailyReport.findOne({
-      $or: [
-        { "resources.found": true },
-        { "codes.found": true }
-      ]
-    }).sort({ date: -1 }).lean();
+    const weatherPattern = /(สภาพอากาศวันนี้|พยากรณ์อากาศ|อากาศวันนี้|weather)/i;
 
-    if (!latestReport) {
+    const [latestAnyReport, latestResourceReport, latestWeatherReport, latestCodeReport] = await Promise.all([
+      DailyReport.findOne({
+        $or: [
+          { 'resources.found': true },
+          { 'codes.found': true },
+        ],
+      })
+        .sort({ date: -1 })
+        .lean(),
+      DailyReport.findOne({ 'resources.locations.0': { $exists: true } })
+        .sort({ date: -1 })
+        .lean(),
+      DailyReport.findOne({
+        'resources.rawText': { $regex: weatherPattern },
+      })
+        .sort({ date: -1 })
+        .lean(),
+      DailyReport.findOne({ 'codes.items.0': { $exists: true } })
+        .sort({ date: -1 })
+        .lean(),
+    ]);
+
+    const baseReport = latestAnyReport ?? latestResourceReport ?? latestWeatherReport ?? latestCodeReport;
+
+    if (!baseReport) {
       res.status(404).json({ success: false, error: 'No reports found' });
       return;
     }
 
-    // 2. ดึงรายงานฉบับล่าสุด "ที่เคยเจอโค้ด" (ย้อนอดีตไปหาใบที่มีโค้ด)
-    const latestCodeReport = await DailyReport.findOne({ "codes.found": true })
-      .sort({ date: -1 })
-      .lean();
+    const resourceSource = latestResourceReport ?? latestWeatherReport ?? baseReport;
+    const weatherSource = latestWeatherReport ?? latestResourceReport ?? baseReport;
+    const codeSource = latestCodeReport ?? baseReport;
 
-    // 3. ประกอบร่างข้อมูล (Fusion Data)
     const fusionData = {
-      ...latestReport, // เอาข้อมูลของวันนี้มากางไว้ก่อน (ได้แร่ของวันนี้มาแล้ว)
-      
-      // เขียนทับหมวด codes ด้วยข้อมูลจากวันที่มีโค้ดแจกล่าสุด
-      codes: latestCodeReport ? latestCodeReport.codes : { found: false, items: [], rawText: '' },
-      
-      // ✨ เพิ่มตัวแปรใหม่ส่งไปให้หน้าเว็บ เพื่อบอกว่าโค้ดอัปเดตวันไหน
-      codeLastUpdated: latestCodeReport ? latestCodeReport.date : null
+      ...baseReport,
+      resources: {
+        found: Boolean(
+          resourceSource?.resources?.found ||
+          weatherSource?.resources?.found,
+        ),
+        rawText: weatherSource?.resources?.rawText ?? '',
+        locations: resourceSource?.resources?.locations ?? [],
+      },
+      codes: codeSource?.codes ?? { found: false, items: [], rawText: '' },
+      codeLastUpdated: latestCodeReport?.date ?? null,
+      resourceLastUpdated: latestResourceReport?.date ?? null,
+      weatherLastUpdated: latestWeatherReport?.date ?? null,
     };
 
-    // ส่งข้อมูลที่ฟิวชั่นแล้วกลับไปให้ Vercel
     res.json({ success: true, data: fusionData });
   } catch (err) {
     res.status(500).json({ success: false, error: String(err) });

@@ -239,11 +239,15 @@ test('Heartopia Daily: ตามล่าพิกัดแร่ + โค้ด
 
   try {
     console.log('⏳ กำลังสั่งให้ Apify บุก Facebook (รอประมาณ 30-60 วินาที)...');
-    
+    const apifyEndpoint = `https://api.apify.com/v2/acts/${ACTOR_ID}/run-sync-get-dataset-items`;
+
     // ยิง API สั่งรันบอทและรอรับผลลัพธ์ (Dataset) กลับมาทันที
-    const response = await fetch(`https://api.apify.com/v2/acts/${ACTOR_ID}/run-sync-get-dataset-items?token=${APIFY_TOKEN}`, {
+    const response = await fetch(apifyEndpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${APIFY_TOKEN}`,
+      },
       body: JSON.stringify({
         "captionText": false,
         "resultsLimit": 3,

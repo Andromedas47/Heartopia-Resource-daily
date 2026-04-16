@@ -26,7 +26,8 @@ router.get('/', async (req: Request, res: Response) => {
       meta: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+    console.error('[reports:list] failed to fetch reports', err);
+    res.status(500).json({ success: false, error: 'Unable to fetch reports' });
   }
 });
 
@@ -92,7 +93,8 @@ router.get('/latest', async (_req: Request, res: Response) => {
 
     res.json({ success: true, data: fusionData });
   } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+    console.error('[reports:latest] failed to build latest report', err);
+    res.status(500).json({ success: false, error: 'Unable to fetch latest report' });
   }
 });
 
@@ -116,7 +118,8 @@ router.get('/:date', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: report });
   } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+    console.error('[reports:by-date] failed to fetch report by date', err);
+    res.status(500).json({ success: false, error: 'Unable to fetch report' });
   }
 });
 

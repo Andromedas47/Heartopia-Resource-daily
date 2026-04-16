@@ -1,4 +1,5 @@
-import { Request, Response, Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { LocationMapping } from '../models/LocationMapping';
 import {
   dedupeNormalizedNames,
@@ -7,6 +8,51 @@ import {
 } from '../utils/locationName';
 
 const router = Router();
+const MAX_BULK_ITEMS = Number(process.env.LOCATION_BULK_MAX_ITEMS ?? 200);
+const writeApiKey = process.env.LOCATION_MAPPINGS_WRITE_API_KEY ?? '';
+
+const writeRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.LOCATION_WRITE_RATE_LIMIT_MAX ?? 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many write requests. Please retry later.' },
+});
+
+function readApiKey(req: Request): string | null {
+  const fromHeader = req.header('x-api-key');
+  if (fromHeader && fromHeader.trim().length > 0) {
+    return fromHeader.trim();
+  }
+
+  const authHeader = req.header('authorization');
+  if (!authHeader) {
+    return null;
+  }
+
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer' || !token) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+function requireWriteAccess(req: Request, res: Response, next: NextFunction): void {
+  if (!writeApiKey) {
+    console.error('[security] LOCATION_MAPPINGS_WRITE_API_KEY is not configured');
+    res.status(500).json({ success: false, error: 'Write API is not configured' });
+    return;
+  }
+
+  const incomingApiKey = readApiKey(req);
+  if (!incomingApiKey || incomingApiKey !== writeApiKey) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return;
+  }
+
+  next();
+}
 
 interface MappingInput {
   locationName: string;
@@ -75,12 +121,13 @@ router.get('/', async (_req: Request, res: Response) => {
 
     res.json({ success: true, data: mappings });
   } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+    console.error('[location-mappings:get] failed to fetch mappings', err);
+    res.status(500).json({ success: false, error: 'Unable to fetch location mappings' });
   }
 });
 
 // POST /api/location-mappings/upsert
-router.post('/upsert', async (req: Request, res: Response) => {
+router.post('/upsert', requireWriteAccess, writeRateLimit, async (req: Request, res: Response) => {
   try {
     const payload = buildMappingPayload(req.body as MappingInput);
 
@@ -92,17 +139,25 @@ router.post('/upsert', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: mapping });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(400).json({ success: false, error: message });
+    console.error('[location-mappings:upsert] failed to upsert mapping', err);
+    res.status(400).json({ success: false, error: 'Invalid mapping payload' });
   }
 });
 
 // POST /api/location-mappings/upsert-many
-router.post('/upsert-many', async (req: Request, res: Response) => {
+router.post('/upsert-many', requireWriteAccess, writeRateLimit, async (req: Request, res: Response) => {
   try {
     const rawItems = Array.isArray(req.body) ? req.body : (req.body?.items as MappingInput[] | undefined);
     if (!Array.isArray(rawItems) || rawItems.length === 0) {
       res.status(400).json({ success: false, error: 'Request body must be a non-empty array or { items: [...] }' });
+      return;
+    }
+
+    if (rawItems.length > MAX_BULK_ITEMS) {
+      res.status(400).json({
+        success: false,
+        error: `Request exceeds maximum allowed items (${MAX_BULK_ITEMS})`,
+      });
       return;
     }
 
@@ -134,13 +189,13 @@ router.post('/upsert-many', async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    res.status(400).json({ success: false, error: message });
+    console.error('[location-mappings:upsert-many] failed to upsert mappings', err);
+    res.status(400).json({ success: false, error: 'Invalid location mappings payload' });
   }
 });
 
 // POST /api/location-mappings/seed-defaults
-router.post('/seed-defaults', async (_req: Request, res: Response) => {
+router.post('/seed-defaults', requireWriteAccess, writeRateLimit, async (_req: Request, res: Response) => {
   try {
     const payloads = DEFAULT_ZONE_MAPPINGS.map((item) => buildMappingPayload(item));
     const result = await LocationMapping.bulkWrite(
@@ -162,7 +217,8 @@ router.post('/seed-defaults', async (_req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: String(err) });
+    console.error('[location-mappings:seed-defaults] failed to seed default mappings', err);
+    res.status(500).json({ success: false, error: 'Unable to seed default mappings' });
   }
 });
 

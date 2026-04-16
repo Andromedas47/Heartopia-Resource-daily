@@ -16,11 +16,21 @@ Use this checklist to deploy an always-on setup where data is updated automatica
 2. Set environment variables on the backend host:
    - MONGODB_URI
    - PORT (if host requires a fixed port)
+   - LOCATION_MAPPINGS_WRITE_API_KEY (required for write endpoints)
+   - CORS_ORIGINS (comma-separated trusted frontend origins)
+   - JSON_BODY_LIMIT (optional, default `64kb`)
+   - LOCATION_BULK_MAX_ITEMS (optional, default `200`)
+   - LOCATION_WRITE_RATE_LIMIT_MAX (optional, default `60` per 15 minutes)
+   - TRUST_PROXY (set `1` for one reverse proxy hop, `true` for full proxy trust if required by your platform)
 3. Verify health endpoint responds:
    - GET /api/health
 4. Verify data endpoints:
    - GET /api/reports/latest
    - GET /api/location-mappings
+5. Verify protected write endpoints require API key:
+   - POST /api/location-mappings/upsert
+   - POST /api/location-mappings/upsert-many
+   - POST /api/location-mappings/seed-defaults
 
 ## 3. Deploy Frontend (Vercel)
 
@@ -55,15 +65,42 @@ Set these repository variables (optional, defaults exist):
 3. Confirm latest report timestamp in DB is updated.
 4. Confirm frontend displays updated report.
 5. Trigger a controlled failure and confirm alert email is received.
+6. Confirm APIFY token is never present in query strings or logs.
 
 ## 6. Ongoing Operations
 
-1. Rotate Facebook auth state regularly.
-2. Rotate SMTP and DB credentials periodically.
+1. Rotate SMTP and DB credentials periodically.
+2. Rotate `LOCATION_MAPPINGS_WRITE_API_KEY` periodically and after any suspected leak.
 3. Review failed runs weekly and clean old artifacts.
 4. Keep Playwright and browser dependencies updated.
 
-## 7. Done Criteria
+## 7. Security Regression Checklist
+
+1. Unauthenticated write calls return `401`/`403`.
+2. CORS rejects unknown origins.
+3. Oversized request bodies and bulk payloads above cap are rejected.
+4. API responses return generic errors only (no stack/error internals).
+5. Security headers from `helmet` are present.
+6. Write route rate limiting is active.
+7. `TRUST_PROXY` is set correctly for your hosting infrastructure.
+
+## 8. Key Rotation Policy
+
+1. Rotate `LOCATION_MAPPINGS_WRITE_API_KEY` at least every 30 days.
+2. Rotate immediately on suspected leak, staff change, or CI secret exposure.
+3. Keep overlap window short: publish new key, deploy clients, revoke old key within 24 hours.
+4. Validate failed-key traffic drops after revocation.
+5. Track all key rotations in `docs/security/key-rotation-log.md`.
+
+## 9. Long-term Auth Migration (Shared Key -> Signed/JWT)
+
+1. Add key identifier (`kid`) support to allow safe key versioning.
+2. Move from static shared key to signed tokens with expiry (`exp`) and issuer (`iss`) claims.
+3. Scope write permissions by route/action in token claims.
+4. Enforce short-lived tokens and automatic key rollover.
+5. Keep shared key fallback only during migration, then remove.
+
+## 10. Done Criteria
 
 You can consider production automation complete when:
 

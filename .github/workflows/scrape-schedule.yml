@@ -3,8 +3,8 @@ name: Heartopia Scrape Scheduler
 on:
   workflow_dispatch:
   schedule:
-    # Asia/Bangkok (UTC+7): 06:05, 12:05, 18:05, 00:05
-    - cron: '5 23,5,11,17 * * *'
+    # Asia/Bangkok (UTC+7): 06:55 daily
+    - cron: '55 23 * * *'
 
 concurrency:
   group: heartopia-scrape-schedule

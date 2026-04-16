@@ -176,7 +176,13 @@ function parseCodes(text: string): ICode[] {
 }
 
 function getTodayDateString(): string {
-  return new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+  // Ensure consistent timezone formatting for Thailand
+  return new Date().toLocaleDateString('fr-CA', {
+    timeZone: 'Asia/Bangkok', // Thailand timezone
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
 }
 
 function scoreResourcePost(text: string): number {

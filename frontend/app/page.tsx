@@ -85,15 +85,15 @@ export default async function Home() {
 
       <Header reportDate={reportDate} lastScraped={scrapedAt} />
 
-      <main className="container mx-auto grid max-w-6xl gap-6 px-3 py-6 sm:gap-8 sm:px-4 sm:py-8 md:gap-10">
+      <main className="container mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 md:gap-12">
         {dataError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            <p className="font-semibold">Dashboard data is unavailable</p>
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive">
+            <p className="font-semibold text-lg">Dashboard data is unavailable</p>
             <p>{dataError}</p>
           </div>
         ) : null}
 
-        <div className="grid gap-5 sm:gap-6 md:grid-cols-2">
+        <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
           <WeatherSection today={inGameWeather.today} forecast={inGameWeather.forecast} />
           <ResourceLocations items={resourceItems} />
         </div>

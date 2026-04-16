@@ -38,35 +38,27 @@ export function ResourceLocations({ items }: ResourceLocationsProps) {
       <CardContent className="space-y-2.5 sm:space-y-3 px-3 sm:px-6 py-3 sm:py-6">
         {items.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border bg-muted/50 p-3 text-sm text-muted-foreground">
-            No locations available in the latest report.
+            <MapPin className="w-5 h-5 text-muted-foreground inline-block mr-2" />
+            No resource locations available.
           </p>
-        ) : null}
-
-        {items.map((resource) => {
-          const style = locationStyle(resource.type)
-          const Icon = style.icon
-
-          return (
-            <div
-              key={resource.name}
-              className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors group active:scale-95 sm:active:scale-100"
-            >
-              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${style.bgColor} flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform`}>
-                <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${style.color}`} />
+        ) : (
+          items.map((item, index) => {
+            const { icon: Icon, color, bgColor, label } = locationStyle(item.type);
+            return (
+              <div
+                key={index}
+                className={`flex items-center gap-3 p-3 rounded-xl border border-border ${bgColor}`}
+              >
+                <Icon className={`w-5 h-5 ${color}`} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{item.name}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground text-xs sm:text-sm">{resource.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {style.label}
-                  {resource.mappedBy ? ` • mapped by ${resource.mappedBy}` : ""}
-                  {resource.source === "fallback" ? " • fallback" : ""}
-                  {resource.source === "missing" ? " • awaiting mapping" : ""}
-                </p>
-              </div>
-            </div>
-          )
-        })}
+            );
+          })
+        )}
       </CardContent>
     </Card>
-  )
+  );
 }

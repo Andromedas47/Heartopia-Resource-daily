@@ -163,15 +163,16 @@ export function formatReportDate(value: string): string {
   }).format(parsed);
 }
 
+// Ensure consistent timezone formatting for Thailand
 export function formatDateTime(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
 
   return new Intl.DateTimeFormat("en-GB", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Bangkok",
-}).format(parsed);
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Bangkok", // Thailand timezone
+  }).format(parsed);
 }
 
 function normalizeWeatherLine(value: string): string {

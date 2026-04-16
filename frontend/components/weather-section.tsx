@@ -29,6 +29,24 @@ function lineToCondition(line: string): string {
 }
 
 export function WeatherSection({ today, forecast }: WeatherSectionProps) {
+  if (!today.length && !forecast.length) {
+    return (
+      <Card className="overflow-hidden border-border/50 shadow-sm">
+        <CardHeader className="pb-2 sm:pb-3 bg-gradient-to-r from-primary/10 to-transparent px-3 sm:px-6 py-3 sm:py-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Sun className="w-5 h-5 text-primary" />
+            Weather Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 sm:px-6 py-3 sm:py-6">
+          <p className="rounded-xl border border-dashed border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+            No weather data available.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const currentLine = today[0] ?? forecast[0] ?? "No weather data"
   const humidityLine = today[1] ?? "No humidity info"
   const windLine = forecast[0] ?? "No wind info"

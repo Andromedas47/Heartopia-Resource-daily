@@ -18,6 +18,24 @@ interface RedeemCodesProps {
 }
 
 export function RedeemCodes({ items, lastUpdated }: RedeemCodesProps) {
+  if (!items.length) {
+    return (
+      <Card className="overflow-hidden border-border/50 shadow-sm">
+        <CardHeader className="pb-2 sm:pb-3 bg-gradient-to-r from-accent/20 to-transparent px-3 sm:px-6 py-3 sm:py-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Gift className="w-5 h-5 text-chart-4" />
+            Redeem Codes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-3 sm:px-6 py-3 sm:py-6">
+          <p className="rounded-xl border border-dashed border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+            No redeem codes available.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const [copiedCode, setCopiedCode] = useState<string | null>(null)
 
   const copyToClipboard = async (code: string) => {

@@ -55,12 +55,25 @@ export function MapSection({ markers, missingLocationNames, mapImageSrc }: MapSe
                   key={location.id}
                   className="absolute group cursor-pointer"
                   style={{ left: `${location.x}%`, top: `${location.y}%`, transform: 'translate(-50%, -50%)' }}
+                  tabIndex={0} // Enable focus for accessibility
+                  onFocus={(e) => {
+                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
+                    if (label) label.style.opacity = '1';
+                  }}
+                  onBlur={(e) => {
+                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
+                    if (label) label.style.opacity = '0';
+                  }}
+                  onClick={(e) => {
+                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
+                    if (label) label.style.opacity = label.style.opacity === '1' ? '0' : '1';
+                  }}
                 >
                   <div className={`relative w-8 h-8 sm:w-10 sm:h-10 ${visual.color} rounded-xl shadow-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform`}>
                     <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                     <div className={`absolute inset-0 ${visual.color} rounded-xl animate-ping opacity-20`} />
                   </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 sm:mt-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card text-foreground text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md border border-border/50">
+                  <div className="marker-label absolute top-full left-1/2 -translate-x-1/2 mt-1 sm:mt-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card text-foreground text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md border border-border/50">
                     {location.name}
                   </div>
                 </div>
@@ -68,21 +81,24 @@ export function MapSection({ markers, missingLocationNames, mapImageSrc }: MapSe
             })}
 
             {/* Map Legend */}
-            <div className="absolute bottom-3 left-3 flex flex-wrap gap-2">
+            <div
+              className="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 flex flex-wrap gap-2 p-2 sm:p-3 bg-card/80 backdrop-blur-md rounded-lg shadow-md border border-border/30"
+              style={{ maxWidth: 'calc(100% - 1rem)' }} // Ensure it fits on small screens
+            >
               {markers.slice(0, 8).map((location) => {
-                const visual = markerVisual(location.type)
-                const Icon = visual.icon
+                const visual = markerVisual(location.type);
+                const Icon = visual.icon;
                 return (
                   <div
                     key={`${location.id}-legend`}
-                    className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card/90 backdrop-blur-sm text-xs text-foreground border border-border/30"
+                    className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card text-xs text-foreground border border-border/30"
                   >
                     <div className={`w-3 h-3 sm:w-4 sm:h-4 ${visual.color} rounded flex items-center justify-center shrink-0`}>
                       <Icon className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
                     </div>
                     <span className="hidden max-w-36 truncate sm:inline text-xs">{location.name}</span>
                   </div>
-                )
+                );
               })}
             </div>
           </div>

@@ -124,6 +124,25 @@ async function main() {
   }
 }
 
-if (require.main === module) {
+function isDirectExecution(): boolean {
+  const isNodeCommonJsEntry =
+    typeof require !== 'undefined' &&
+    typeof module !== 'undefined' &&
+    require.main === module;
+
+  if (isNodeCommonJsEntry) {
+    return true;
+  }
+
+  const isBunRuntime = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
+  if (!isBunRuntime) {
+    return false;
+  }
+
+  const entryArg = process.argv[1] ?? '';
+  return /(?:^|[\\/])index\.(?:ts|js)$/.test(entryArg);
+}
+
+if (isDirectExecution()) {
   void main();
 }

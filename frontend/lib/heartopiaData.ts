@@ -168,9 +168,10 @@ export function formatDateTime(value: string): string {
   if (Number.isNaN(parsed.getTime())) return value;
 
   return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(parsed);
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "Asia/Bangkok",
+}).format(parsed);
 }
 
 function normalizeWeatherLine(value: string): string {

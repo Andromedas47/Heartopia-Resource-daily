@@ -1,3 +1,4 @@
+"use client"
 import Image from "next/image"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Map, Compass, Gem, Trees, MapPin } from "lucide-react"

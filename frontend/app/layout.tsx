@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito, Nunito_Sans } from "next/font/google";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -15,6 +17,11 @@ const nunitoSans = Nunito_Sans({
 export const metadata: Metadata = {
   title: "Heartopia Daily",
   description: "Your cozy daily companion for Heartopia - resources, weather, and redeem codes.",
+  openGraph: {
+    title: "Heartopia Daily",
+    description: "Daily resources, weather, and redeem codes for Heartopia players.",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
@@ -27,9 +34,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="bg-background">
+    <html lang="en" className="bg-background" suppressHydrationWarning>
       <body className={`${nunito.variable} ${nunitoSans.variable} font-sans antialiased`}>
-        {children}
+        <ThemeProvider>
+          {children}
+          <Toaster richColors position="top-right" closeButton />
+        </ThemeProvider>
       </body>
     </html>
   );

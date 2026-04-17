@@ -5,6 +5,8 @@ import { RedeemCodes } from "@/components/redeem-codes";
 import { ResourceLocations } from "@/components/resource-locations";
 import { WeatherSection } from "@/components/weather-section";
 import {
+  dedupeCodeItems,
+  dedupeMappedLocations,
   buildLocationMappingLookup,
   buildStaticMappingLookup,
   formatDateTime,
@@ -40,7 +42,8 @@ export default async function Home() {
   const locationLookup = buildLocationMappingLookup(locationMappings);
   const staticLookup = buildStaticMappingLookup();
   const mappedLocations = mapLocationsToCoordinates(normalizedLocations, locationLookup, staticLookup);
-  const missingLocationNames = mappedLocations
+  const uniqueLocations = dedupeMappedLocations(mappedLocations);
+  const missingLocationNames = uniqueLocations
     .filter((location) => location.source === "missing")
     .map((location) => location.name);
 
@@ -49,21 +52,21 @@ export default async function Home() {
   const codeLastUpdated = latestReport?.codeLastUpdated ? formatReportDate(latestReport.codeLastUpdated) : undefined;
   const scrapedAt = latestReport ? formatDateTime(latestReport.scrapedAt) : "Waiting for data";
 
-  const resourceItems = mappedLocations.map((location) => ({
+  const resourceItems = uniqueLocations.map((location) => ({
     name: location.name,
     type: location.type,
     source: location.source,
     mappedBy: location.mappedBy,
   }));
 
-  const codeItems = normalizedCodes.map((item, index) => ({
+  const codeItems = dedupeCodeItems(normalizedCodes).map((item, index) => ({
     code: item.code,
     rewards: item.detail || "No reward details",
     expires: item.expiry || "No expiry info",
     isNew: index < 2,
   }));
 
-  const mapMarkers = mappedLocations
+  const mapMarkers = uniqueLocations
     .filter((location) => location.x !== null && location.y !== null)
     .map((location, index) => ({
       id: `${location.normalizedName}-${index}`,
@@ -73,38 +76,40 @@ export default async function Home() {
       type: location.type,
     }));
 
+  const summaryStats = [
+    { label: "Codes", value: String(codeItems.length) },
+    { label: "Locations", value: String(resourceItems.length) },
+    { label: "Weather lines", value: String(inGameWeather.today.length + inGameWeather.forecast.length) },
+  ];
+
   const dataError = latestReport === null ? latestResult.error ?? "Unable to load dashboard data." : null;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-10 -left-20 h-40 w-40 rounded-full bg-primary/5 blur-3xl sm:h-64 sm:w-64" />
-        <div className="absolute top-20 -right-32 h-64 w-64 rounded-full bg-accent/10 blur-3xl sm:h-96 sm:w-96" />
-        <div className="absolute -bottom-20 left-1/4 h-48 w-48 rounded-full bg-chart-3/5 blur-3xl sm:h-80 sm:w-80" />
-      </div>
+      <Header reportDate={reportDate} lastScraped={scrapedAt} stats={summaryStats} />
 
-      <Header reportDate={reportDate} lastScraped={scrapedAt} />
-
-      <main className="container mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-10 md:gap-12">
+      <main className="container mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-8 lg:py-10">
         {dataError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive">
+          <div className="rounded-3xl border border-destructive/30 bg-destructive/10 px-5 py-4 text-sm text-destructive shadow-sm backdrop-blur">
             <p className="font-semibold text-lg">Dashboard data is unavailable</p>
             <p>{dataError}</p>
           </div>
         ) : null}
 
-        <div className="grid gap-6 sm:gap-8 md:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <WeatherSection today={inGameWeather.today} forecast={inGameWeather.forecast} />
-          <ResourceLocations items={resourceItems} />
+          <RedeemCodes items={codeItems} lastUpdated={codeLastUpdated} />
         </div>
 
-        <RedeemCodes items={codeItems} lastUpdated={codeLastUpdated} />
-
-        <MapSection
-          markers={mapMarkers}
-          missingLocationNames={missingLocationNames}
-          mapImageSrc={MAP_IMAGE_SRC}
-        />
+        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+          <ResourceLocations items={resourceItems} />
+          <MapSection
+            id="world-map"
+            markers={mapMarkers}
+            missingLocationNames={missingLocationNames}
+            mapImageSrc={MAP_IMAGE_SRC}
+          />
+        </div>
       </main>
 
       <Footer />

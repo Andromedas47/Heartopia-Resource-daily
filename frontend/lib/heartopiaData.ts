@@ -1,5 +1,6 @@
 import { LOCATION_ALIAS_MAP, LOCATION_COORDINATE_MAP } from "../app/locationMapping";
 import type {
+  CodeItem,
   InGameWeatherData,
   Location,
   LocationMapping,
@@ -149,6 +150,28 @@ export function mapLocationsToCoordinates(
       y: null,
       source: "missing",
     };
+  });
+}
+
+export function dedupeMappedLocations(locations: MappedLocation[]): MappedLocation[] {
+  const seen = new Set<string>();
+
+  return locations.filter((location) => {
+    const key = `${location.normalizedName}|${location.type}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function dedupeCodeItems(items: CodeItem[]): CodeItem[] {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.code.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 

@@ -116,11 +116,28 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: light;
+  }
+
+  .dark html {
+    color-scheme: dark;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
 
   body {
     @apply bg-background text-foreground;
+    min-height: 100vh;
+    background-image: linear-gradient(to bottom, color-mix(in oklab, var(--background) 98%, white 2%), var(--background));
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 32%, transparent);
+    color: var(--primary-foreground);
   }
 }

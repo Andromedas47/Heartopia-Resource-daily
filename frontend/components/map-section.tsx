@@ -1,7 +1,8 @@
 "use client"
 import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Map, Compass, Gem, Trees, MapPin } from "lucide-react"
+import { Compass, Gem, Map, MapPin, Trees } from "lucide-react"
 
 interface MapMarker {
   id: string
@@ -12,6 +13,7 @@ interface MapMarker {
 }
 
 interface MapSectionProps {
+  id?: string
   markers: MapMarker[]
   missingLocationNames: string[]
   mapImageSrc: string
@@ -23,21 +25,54 @@ function markerVisual(type: MapMarker["type"]) {
   return { icon: MapPin, color: "bg-chart-4" }
 }
 
-export function MapSection({ markers, missingLocationNames, mapImageSrc }: MapSectionProps) {
+export function MapSection({ id, markers, missingLocationNames, mapImageSrc }: MapSectionProps) {
+  const typeCounts = markers.reduce(
+    (counts, marker) => {
+      counts[marker.type] += 1
+      return counts
+    },
+    { oak: 0, glowstone: 0, unknown: 0 },
+  )
+
   return (
-    <Card className="w-full overflow-hidden border-border/50 shadow-sm">
-      <CardHeader className="pb-2 sm:pb-3 bg-gradient-to-r from-chart-3/10 to-transparent px-3 sm:px-6 py-3 sm:py-4">
-        <CardTitle className="flex items-center gap-2 text-base sm:text-lg" style={{ fontFamily: 'var(--font-display)' }}>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-chart-3/20 flex items-center justify-center shrink-0">
-            <Map className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-chart-3" />
+    <Card id={id} className="w-full overflow-hidden border-border/60 bg-card/95 shadow-sm">
+      <CardHeader
+        className="border-b border-border/50 px-4 py-4 sm:px-6"
+        style={{ backgroundImage: "linear-gradient(90deg, color-mix(in oklab, var(--chart-3) 10%, transparent), transparent)" }}
+      >
+        <div className="flex flex-col gap-4">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg" style={{ fontFamily: 'var(--font-display)' }}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-chart-3/20 text-chart-3 shadow-sm">
+              <Map className="h-4 w-4" />
+            </div>
+            World Map
+            <Compass className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+          </CardTitle>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="rounded-full px-2.5 py-1">
+              {markers.length} markers
+            </Badge>
+            <Badge variant="outline" className="rounded-full px-2.5 py-1">
+              {typeCounts.oak} oak
+            </Badge>
+            <Badge variant="outline" className="rounded-full px-2.5 py-1">
+              {typeCounts.glowstone} glowstone
+            </Badge>
+            {missingLocationNames.length > 0 ? (
+              <Badge variant="destructive" className="rounded-full px-2.5 py-1">
+                {missingLocationNames.length} unmapped
+              </Badge>
+            ) : null}
           </div>
-          World Map
-          <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground ml-auto shrink-0" />
-        </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="px-3 sm:px-6 py-3 sm:py-6">
-        <div className="rounded-2xl border border-border/30 bg-muted/20 p-2 sm:p-3">
-          <div className="relative mx-auto w-full max-w-[960px] aspect-square overflow-hidden rounded-xl bg-sky-100/20">
+      <CardContent className="px-4 py-4 sm:px-6 sm:py-6">
+        <div
+          className="rounded-[1.75rem] border border-border/60 p-3"
+          style={{ backgroundImage: "linear-gradient(135deg, color-mix(in oklab, var(--muted) 25%, transparent), color-mix(in oklab, var(--primary) 5%, transparent))" }}
+        >
+          <div className="relative mx-auto aspect-square w-full max-w-240 overflow-hidden rounded-3xl bg-sky-100/20">
             <Image
               src={mapImageSrc}
               alt="Heartopia map"
@@ -47,66 +82,71 @@ export function MapSection({ markers, missingLocationNames, mapImageSrc }: MapSe
               className="object-contain opacity-100"
             />
 
-            {/* Map Locations */}
+            <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(to top, color-mix(in oklab, var(--background) 10%, transparent), transparent)" }} />
+
             {markers.map((location) => {
               const visual = markerVisual(location.type)
               const Icon = visual.icon
               return (
-                <div
+                <button
                   key={location.id}
-                  className="absolute group cursor-pointer"
-                  style={{ left: `${location.x}%`, top: `${location.y}%`, transform: 'translate(-50%, -50%)' }}
-                  tabIndex={0} // Enable focus for accessibility
-                  onFocus={(e) => {
-                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
-                    if (label) label.style.opacity = '1';
-                  }}
-                  onBlur={(e) => {
-                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
-                    if (label) label.style.opacity = '0';
-                  }}
-                  onClick={(e) => {
-                    const label = e.currentTarget.querySelector<HTMLElement>('.marker-label');
-                    if (label) label.style.opacity = label.style.opacity === '1' ? '0' : '1';
-                  }}
+                  type="button"
+                  className="group absolute -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: `${location.x}%`, top: `${location.y}%` }}
+                  aria-label={location.name}
                 >
-                  <div className={`relative w-8 h-8 sm:w-10 sm:h-10 ${visual.color} rounded-xl shadow-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform`}>
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <div className={`absolute inset-0 ${visual.color} rounded-xl animate-ping opacity-20`} />
+                  <div className={`relative flex h-6 w-6 items-center justify-center rounded-xl ${visual.color} text-white shadow-sm transition-transform group-hover:scale-110 group-focus-visible:scale-110`}>
+                    <Icon className="h-3.5 w-3.5" />
+                    <div className={`absolute inset-0 rounded-xl ${visual.color} opacity-5`} />
                   </div>
-                  <div className="marker-label absolute top-full left-1/2 -translate-x-1/2 mt-1 sm:mt-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card text-foreground text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity shadow-md border border-border/50">
+
+                  <div className="pointer-events-none absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap rounded-full border border-border/60 bg-card px-2.5 py-1 text-[11px] font-semibold text-foreground opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     {location.name}
                   </div>
-                </div>
+                </button>
               )
             })}
 
-            {/* Map Legend */}
-            <div
-              className="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 flex flex-wrap gap-2 p-2 sm:p-3 bg-card/80 backdrop-blur-md rounded-lg shadow-md border border-border/30"
-              style={{ maxWidth: 'calc(100% - 1rem)' }} // Ensure it fits on small screens
-            >
-              {markers.slice(0, 8).map((location) => {
-                const visual = markerVisual(location.type);
-                const Icon = visual.icon;
+            <div className="absolute inset-x-3 bottom-3 hidden flex-col gap-2 rounded-2xl border border-border/60 bg-card/95 p-2.5 text-xs shadow-sm sm:inset-x-auto sm:bottom-5 sm:left-5 sm:flex sm:flex-row sm:flex-wrap sm:items-center">
+              {[
+                { label: "Oak", color: "bg-primary", icon: Trees },
+                { label: "Glowstone", color: "bg-chart-3", icon: Gem },
+                { label: "Unknown", color: "bg-chart-4", icon: MapPin },
+              ].map((entry) => {
+                const Icon = entry.icon
                 return (
-                  <div
-                    key={`${location.id}-legend`}
-                    className="flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-lg bg-card text-xs text-foreground border border-border/30"
-                  >
-                    <div className={`w-3 h-3 sm:w-4 sm:h-4 ${visual.color} rounded flex items-center justify-center shrink-0`}>
-                      <Icon className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
-                    </div>
-                    <span className="hidden max-w-36 truncate sm:inline text-xs">{location.name}</span>
+                  <div key={entry.label} className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/70 px-2.5 py-1">
+                    <span className={`flex h-4 w-4 items-center justify-center rounded-full ${entry.color} text-white`}>
+                      <Icon className="h-2.5 w-2.5" />
+                    </span>
+                    <span className="text-foreground">{entry.label}</span>
                   </div>
-                );
+                )
               })}
             </div>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-border/60 bg-card/95 p-2.5 text-xs shadow-sm sm:hidden">
+            {[
+              { label: "Oak", color: "bg-primary", icon: Trees },
+              { label: "Glowstone", color: "bg-chart-3", icon: Gem },
+              { label: "Unknown", color: "bg-chart-4", icon: MapPin },
+            ].map((entry) => {
+              const Icon = entry.icon
+              return (
+                <div key={entry.label} className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/70 px-2.5 py-1">
+                  <span className={`flex h-4 w-4 items-center justify-center rounded-full ${entry.color} text-white`}>
+                    <Icon className="h-2.5 w-2.5" />
+                  </span>
+                  <span className="text-foreground">{entry.label}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {missingLocationNames.length > 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+          <p className="mt-3 rounded-2xl border border-dashed border-border bg-muted/40 p-3 text-xs text-muted-foreground">
             {missingLocationNames.length} locations are awaiting coordinate mapping.
           </p>
         ) : null}
